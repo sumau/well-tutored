@@ -17,6 +17,7 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const receiptRef = useRef<HTMLDivElement>(null);
+  const focusFirstFieldOnReset = useRef(false);
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({});
 
   const [form, setForm] = useState({
@@ -60,8 +61,16 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
   useEffect(() => {
     if (receipt) {
       receiptRef.current?.focus();
+    } else if (focusFirstFieldOnReset.current) {
+      focusFirstFieldOnReset.current = false;
+      fieldRefs.current.name?.focus();
     }
   }, [receipt]);
+
+  const handleReset = () => {
+    focusFirstFieldOnReset.current = true;
+    setReceipt(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,8 +131,9 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
         <p className="text-muted-foreground text-[14px] leading-[1.6] max-w-[360px] mx-auto mb-8">
           {receipt.message}
         </p>
-        <button 
-          onClick={() => setReceipt(null)}
+        <button
+          type="button"
+          onClick={handleReset}
           className="bg-foreground text-background text-[12px] font-bold px-6 py-3.5 hover:bg-primary transition-colors inline-flex items-center justify-center gap-2"
           data-testid="enquiry-reset"
         >

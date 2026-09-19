@@ -126,6 +126,15 @@ function submitWithKeyboard(form: HTMLFormElement, button: HTMLButtonElement) {
   form.requestSubmit(button);
 }
 
+function activateButtonWithKeyboard(button: HTMLButtonElement, key: "Enter" | " ") {
+  button.dispatchEvent(new KeyboardEvent("keydown", {
+    key,
+    code: key === "Enter" ? "Enter" : "Space",
+    bubbles: true,
+  }));
+  button.click();
+}
+
 function tabToNext(current: HTMLElement, next: HTMLElement) {
   current.dispatchEvent(new KeyboardEvent("keydown", {
     key: "Tab",
@@ -313,12 +322,24 @@ test("keyboard users can complete an enquiry, recover validation focus, and reac
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    const receipt = rendered.container.querySelector("[data-testid=enquiry-success]")!;
+     const receipt = rendered.container.querySelector<HTMLDivElement>("[data-testid=enquiry-success]")!;
     assert.equal(document.activeElement, receipt);
     assert.equal(receipt.getAttribute("role"), "status");
     assert.equal(receipt.getAttribute("aria-live"), "polite");
     assert.match(receipt.textContent ?? "", /Message delivered/);
     assert.match(receipt.textContent ?? "", /Your enquiry has been sent securely\./);
+
+    const resetButton = rendered.container.querySelector<HTMLButtonElement>("[data-testid=enquiry-reset]")!;
+    await act(async () => {
+      tabToNext(receipt, resetButton);
+    });
+    assert.equal(document.activeElement, resetButton);
+
+    await act(async () => {
+      activateButtonWithKeyboard(resetButton, "Enter");
+    });
+    assert.equal(rendered.container.querySelector("[data-testid=enquiry-success]"), null);
+    assert.equal(document.activeElement, rendered.container.querySelector("#enquiry-parent-name"));
   } finally {
     globalThis.fetch = originalFetch;
     await cleanupForm(rendered);
