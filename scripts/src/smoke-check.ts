@@ -136,9 +136,11 @@ function resolveArtifactProductionUrl(): { value: string; source: string } {
     );
   }
 
+  parseHttpUrl(configuredUrl, PRODUCTION_URL_CONFIG_KEY);
+
   return {
     value: configuredUrl,
-    source: `Well Tutored artifact deployment configuration (${PRODUCTION_URL_CONFIG_KEY})`,
+    source: PRODUCTION_URL_CONFIG_KEY,
   };
 }
 

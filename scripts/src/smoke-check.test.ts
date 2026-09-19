@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   createServer,
   type IncomingMessage,
@@ -44,6 +45,12 @@ const resource = {
   excerpt: "A short guide.",
   publishedAt: "2026-01-01T00:00:00.000Z",
 };
+
+const scriptsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const artifactConfigPath = resolve(
+  scriptsRoot,
+  "../artifacts/well-tutored/.replit-artifact/artifact.toml",
+);
 
 function writeJson(
   response: ServerResponse<IncomingMessage>,
@@ -284,7 +291,6 @@ function runSmokeCommand(
   exitCode: number | null;
   output: string;
 }> {
-  const scriptsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const smokeFile = resolve(scriptsRoot, "src/smoke-check.ts");
   const child = spawn(
     process.execPath,
@@ -302,6 +308,7 @@ function runSmokeCommand(
         ...(options.publishedUrl
           ? { SMOKE_PUBLISHED_URL: options.publishedUrl }
           : { SMOKE_PUBLISHED_URL: "" }),
+        REPLIT_PUBLISHED_URL: "",
         SMOKE_TIMEOUT_MS: options.timeoutMs ?? "2000",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -320,6 +327,68 @@ function runSmokeCommand(
     child.once("close", (exitCode) => resolveResult({ exitCode, output }));
   });
 }
+
+test("malformed SMOKE_PUBLISHED_URL fails before contacting loopback or production", async () => {
+  const fixture = await startFixture({
+    name: "unused published URL validation fixture",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(undefined, {
+      published: true,
+      publishedUrl: "not-a-url",
+    });
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /SMOKE_PUBLISHED_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
+    );
+    assert.deepEqual(fixture.requests, []);
+    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("malformed SMOKE_PRODUCTION_URL fails before contacting loopback or production", async () => {
+  const fixture = await startFixture({
+    name: "unused production URL validation fixture",
+    expectedMessage: "",
+    respond: () => false,
+  });
+  const originalArtifactConfig = readFileSync(artifactConfigPath, "utf8");
+  const malformedArtifactConfig = originalArtifactConfig.replace(
+    /SMOKE_PRODUCTION_URL\s*=\s*"[^"\r\n]*"/,
+    'SMOKE_PRODUCTION_URL = "not-a-url"',
+  );
+  assert.notEqual(
+    malformedArtifactConfig,
+    originalArtifactConfig,
+    "expected the artifact production URL setting to be present",
+  );
+  writeFileSync(artifactConfigPath, malformedArtifactConfig);
+
+  try {
+    const result = await runSmokeCommand(undefined, {
+      published: true,
+      publishedUrl: "https://welltutored.replit.app",
+    });
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /SMOKE_PRODUCTION_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
+    );
+    assert.deepEqual(fixture.requests, []);
+    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+  } finally {
+    writeFileSync(artifactConfigPath, originalArtifactConfig);
+    await fixture.close();
+  }
+});
 
 test("malformed SMOKE_BASE_URL fails before contacting loopback or production", async () => {
   const fixture = await startFixture({
