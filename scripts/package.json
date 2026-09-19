@@ -7,11 +7,16 @@
     "hello": "tsx ./src/hello.ts",
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
+    "smoke:enquiry": "tsx ./src/enquiry-browser-smoke.ts",
+    "smoke:enquiry:published": "tsx ./src/enquiry-browser-smoke.ts --published",
     "test:smoke": "tsx --test ./src/smoke-check.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsx": "catalog:"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
   }
 }

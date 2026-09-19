@@ -203,12 +203,12 @@ function parseHttpUrl(value: string, source: string): URL {
   return baseUrl;
 }
 
-function resolveBaseUrl(): URL {
+export function resolveBaseUrl(): URL {
   const configured = resolveConfiguredBaseUrl();
   return parseHttpUrl(configured.value, configured.source);
 }
 
-function resolveTimeoutMs(): number {
+export function resolveTimeoutMs(): number {
   const configured = Number(process.env.SMOKE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   if (!Number.isFinite(configured) || configured <= 0) {
     throw new SmokeCheckError(

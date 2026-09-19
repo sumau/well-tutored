@@ -60,6 +60,23 @@ The check does not require workspace credentials. It verifies:
 - invalid enquiry recovery by sending `{}` to `POST /api/enquiries`, expecting
   a `400` validation response, and checking health again afterward.
 
+The published enquiry form also has a real-browser keyboard smoke check:
+
+```sh
+SMOKE_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:enquiry:published
+```
+
+It uses the current Publishing URL rules above, traverses the form with native
+Tab and Enter actions, verifies validation recovery and disabled-submit
+behavior, and intercepts the final response so the check does not create a
+production enquiry.
+
+For local or custom-domain verification, use the explicit override:
+
+```sh
+SMOKE_BASE_URL=https://example.test pnpm smoke:enquiry
+```
+
 The enquiry payload is intentionally invalid, so the API rejects it before
 looking up a tutor or inserting an enquiry. The command exits non-zero with
 the failing endpoint and response contract when a check does not match.

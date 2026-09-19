@@ -1,0 +1,209 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium, type Page } from "playwright-core";
+import { resolveBaseUrl, resolveTimeoutMs } from "./smoke-check.js";
+
+const DEFAULT_CHROMIUM_PATH = "/repl/tools/bin/chromium";
+
+class BrowserSmokeCheckError extends Error {}
+
+async function activeElementId(page: Page) {
+  return page.evaluate(() => {
+    const activeElement = (globalThis as any).document.activeElement;
+    return activeElement?.id || activeElement?.getAttribute("data-testid") || "";
+  });
+}
+
+async function tabUntil(
+  page: Page,
+  expectedId: string,
+  timeoutMs: number,
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await page.keyboard.press("Tab");
+    if ((await activeElementId(page)) === expectedId) return;
+  }
+  throw new BrowserSmokeCheckError(
+    `Keyboard focus did not reach "${expectedId}" before the ${timeoutMs}ms timeout.`,
+  );
+}
+
+async function expectActive(
+  page: Page,
+  expectedId: string,
+) {
+  const actualId = await activeElementId(page);
+  if (actualId !== expectedId) {
+    throw new BrowserSmokeCheckError(
+      `Expected keyboard focus on "${expectedId}", found "${actualId || "document body"}".`,
+    );
+  }
+}
+
+async function tabTo(
+  page: Page,
+  expectedId: string,
+) {
+  await page.keyboard.press("Tab");
+  await expectActive(page, expectedId);
+}
+
+async function fillFocused(
+  page: Page,
+  value: string,
+) {
+  await page.keyboard.insertText(value);
+}
+
+async function runBrowserSmokeCheck() {
+  const baseUrl = resolveBaseUrl();
+  const timeoutMs = resolveTimeoutMs();
+  const browser = await chromium.launch({
+    executablePath: process.env.SMOKE_CHROMIUM_PATH || DEFAULT_CHROMIUM_PATH,
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.route("**/api/enquiries", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 42,
+          tutorName: "Alice Smith",
+          receivedAt: "2026-09-19T12:00:00.000Z",
+          deliveryStatus: "delivered",
+          message: "Your enquiry has been sent securely.",
+        }),
+      });
+    });
+
+    await page.goto(new URL("/enquire", baseUrl).toString(), {
+      waitUntil: "domcontentloaded",
+      timeout: timeoutMs,
+    });
+    await page.locator("[data-testid=enquiry-form]").waitFor({
+      state: "visible",
+      timeout: timeoutMs,
+    });
+
+    await tabUntil(page, "enquiry-parent-name", timeoutMs);
+    await fillFocused(page, "Eleanor James");
+    await tabTo(page, "enquiry-parent-email");
+    await fillFocused(page, "not-an-email");
+    await tabTo(page, "enquiry-tutor");
+    await page.keyboard.press("ArrowDown");
+    if (!(await page.locator("#enquiry-tutor").inputValue())) {
+      throw new BrowserSmokeCheckError(
+        "Keyboard selection did not choose the available tutor.",
+      );
+    }
+    await tabTo(page, "enquiry-student-name");
+    await fillFocused(page, "Maya");
+    await tabTo(page, "enquiry-student-age");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    if (
+      await page.locator("#enquiry-student-age").inputValue() !== "13-15"
+    ) {
+      throw new BrowserSmokeCheckError(
+        "Keyboard selection did not choose the student's age.",
+      );
+    }
+    await tabTo(page, "enquiry-subject-level");
+    await fillFocused(page, "GCSE English Literature");
+    await tabTo(page, "enquiry-message");
+    await fillFocused(page, "Maya would benefit from essay planning support.");
+
+    await page.keyboard.press("Tab");
+    if (await activeElementId(page) === "button-submit-enquiry") {
+      throw new BrowserSmokeCheckError(
+        "The disabled submit button incorrectly entered the native Tab order.",
+      );
+    }
+    await page.keyboard.press("Shift+Tab");
+    await expectActive(page, "enquiry-message");
+    for (let index = 0; index < 5; index += 1) {
+      await page.keyboard.press("Shift+Tab");
+    }
+    await expectActive(page, "enquiry-parent-email");
+    await page.keyboard.press("Enter");
+    await page.locator("#enquiry-parent-email-error").waitFor({
+      state: "visible",
+      timeout: timeoutMs,
+    });
+    await expectActive(page, "enquiry-parent-email");
+    if (
+      (await page.locator("#enquiry-parent-email").getAttribute("aria-invalid")) !==
+      "true"
+    ) {
+      throw new BrowserSmokeCheckError(
+        "Invalid email submission did not announce the invalid field.",
+      );
+    }
+
+    await page.keyboard.press("Control+A");
+    await fillFocused(page, "eleanor@example.com");
+    await tabTo(page, "enquiry-tutor");
+    await tabTo(page, "enquiry-student-name");
+    await tabTo(page, "enquiry-student-age");
+    await tabTo(page, "enquiry-subject-level");
+    await tabTo(page, "enquiry-message");
+    await page.keyboard.press("Tab");
+    await expectActive(page, "button-submit-enquiry");
+    if (await page.locator("[data-testid=button-submit-enquiry]").isDisabled()) {
+      throw new BrowserSmokeCheckError(
+        "The completed enquiry remained disabled at the submission step.",
+      );
+    }
+    await page.keyboard.press("Enter");
+
+    const receipt = page.locator("[data-testid=enquiry-success]");
+    await receipt.waitFor({ state: "visible", timeout: timeoutMs });
+    if ((await receipt.getAttribute("role")) !== "status") {
+      throw new BrowserSmokeCheckError("The success receipt is not a status announcement.");
+    }
+    if ((await receipt.getAttribute("aria-live")) !== "polite") {
+      throw new BrowserSmokeCheckError("The success receipt is not announced politely.");
+    }
+    if (!(await receipt.innerText()).includes("Your enquiry has been sent securely.")) {
+      throw new BrowserSmokeCheckError(
+        "The success receipt did not contain the delivery confirmation.",
+      );
+    }
+    await expectActive(page, "enquiry-success");
+
+    console.log(`Enquiry keyboard smoke check passed for ${baseUrl.origin}`);
+    console.log("  ✓ native Tab order and disabled-submit behavior");
+    console.log("  ✓ Enter validation recovery");
+    console.log("  ✓ keyboard submission and announced success receipt");
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function main(): Promise<number> {
+  try {
+    await runBrowserSmokeCheck();
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Enquiry keyboard smoke check failed: ${message}`);
+    return 1;
+  }
+}
+
+const invokedFile = process.argv[1] ? resolve(process.argv[1]) : undefined;
+const currentFile = resolve(fileURLToPath(import.meta.url));
+
+if (invokedFile === currentFile) {
+  process.exitCode = await main();
+}
