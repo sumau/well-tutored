@@ -1,0 +1,253 @@
+I would **not rewrite the stack**. React, Express, Drizzle, Clerk, and the generated OpenAPI client are reasonable choices. The main problem is that domain logic, database queries, HTTP handling, and UI composition are currently too intertwined—especially in the workspace API and workspace pages. 
+
+## 1. Split the large workspace route
+
+The biggest improvement would be breaking `artifacts/api-server/src/routes/workspace.ts` into smaller feature areas:
+
+```text
+api-server/src/
+  routes/
+    public-content.ts
+    enquiries.ts
+    workspace/
+      session.ts
+      articles.ts
+      profiles.ts
+      tutors.ts
+      accounts.ts
+  services/
+    workspace-account-service.ts
+    tutor-profile-service.ts
+    article-service.ts
+  auth/
+    workspace-access.ts
+  presenters/
+    tutor-presenter.ts
+    resource-presenter.ts
+```
+
+The current workspace file handles all of these at once:
+
+- Clerk user lookup
+- Workspace account provisioning
+- Role checks
+- Tutor creation
+- Profile draft handling
+- Profile publishing
+- Article CRUD
+- Account assignment
+- Database queries
+- Response formatting
+- Validation rules
+
+Each route should mostly become:
+
+```ts
+router.patch("/workspace/profile", async (req, res) => {
+  const account = await requireApprovedWorkspaceAccount(req);
+  const input = updateProfileSchema.parse(req.body);
+  const profile = await tutorProfileService.update(account, input);
+  res.json(tutorPresenter.toWorkspace(profile));
+});
+```
+
+That makes the important behavior visible without forcing someone to understand the entire workspace system.
+
+## 2. Extract authorization and account provisioning
+
+The same account lookup and permission checks are central to nearly every workspace route. I would replace the current repeated pattern with explicit helpers:
+
+```ts
+const account = await requireWorkspaceAccount(req);
+requireApproved(account);
+requireOwner(account);
+```
+
+Or, even better, middleware for the common cases:
+
+```ts
+router.use("/workspace", requireWorkspaceAccount);
+router.use("/workspace/articles", requireApprovedWorkspaceUser);
+router.use("/workspace/accounts", requireOwner);
+```
+
+I would keep the existing behavior where a first verified Clerk user gets a pending workspace account, but move it into a clearly named service such as:
+
+```ts
+workspaceAccountService.findOrProvisionFromClerkUser(userId)
+```
+
+The current `GET /workspace/me` endpoint provisions accounts as a side effect. That can remain behaviorally compatible, but the side effect should be isolated and documented instead of being hidden inside a general route handler.
+
+## 3. Turn tutor publishing into an explicit domain state machine
+
+The draft/published behavior is important enough to deserve named operations rather than being spread through a large update handler.
+
+```ts
+tutorProfileService.saveDraft(tutorId, changes)
+tutorProfileService.publish(tutorId)
+tutorProfileService.discardDraft(tutorId)
+tutorProfileService.archive(tutorId)
+tutorProfileService.restore(tutorId)
+```
+
+The same applies to articles:
+
+```ts
+articleService.createDraft(...)
+articleService.updateDraft(...)
+articleService.publish(...)
+articleService.delete(...)
+```
+
+This preserves the current behavior while making the rules easy to test:
+
+- A published profile can have a private draft.
+- Public routes continue to use the published profile.
+- Publishing validates the complete profile.
+- Discarding a draft restores the published snapshot.
+- Archived tutors cannot be edited until restored.
+
+The existing `isPublishableProfile` and `isPublishableArticle` functions should become reusable domain validators rather than remaining embedded in the route module.
+
+## 4. Centralize response mapping
+
+The code currently maps database rows into public, workspace, article, and tutor responses in several places. I would create one presenter per public domain object:
+
+```ts
+tutorPresenter.toPublic(tutor, resources)
+tutorPresenter.toWorkspace(tutor, resources)
+resourcePresenter.toCard(resource, tutor)
+resourcePresenter.toDetail(resource, tutor, relatedResources)
+```
+
+This would centralize details such as:
+
+- Converting numeric database rates
+- Normalizing tutor accents
+- Deriving public slugs
+- Calculating read time
+- Normalizing legacy resource types
+- Applying a tutor’s published/draft state
+
+It would also prevent subtle differences between the homepage, tutor detail page, and workspace response.
+
+## 5. Clean up the data model without a risky migration
+
+I would not immediately rename the physical database tables. The existing `studio_accounts` table is a legacy identifier and changing it would add migration risk.
+
+Instead, I would simplify the application vocabulary:
+
+- Use `workspaceAccountsTable` everywhere in application code.
+- Keep `studio_accounts` only as the database table name.
+- Introduce a single domain-level `TutorProfile` type.
+- Treat `firstName`, `lastName`, and `name` consistently.
+- Centralize slug generation and lookup.
+- Centralize resource status and tutor availability constants.
+
+There are also values that are derived repeatedly:
+
+- Article read time is recalculated from the content.
+- Public tutor slugs can be derived from the tutor name.
+- Resource tint is effectively derived from the tutor.
+
+I would decide which fields are authoritative and document that decision. For example, read time and public tint should probably be derived values rather than independently stored state.
+
+## 6. Refactor the frontend by feature, not by page
+
+The public pages are understandable, but the workspace pages contain large forms and a lot of inline layout logic. I would organize them like this:
+
+```text
+well-tutored/src/
+  features/
+    tutors/
+      TutorCard.tsx
+      TutorProfileView.tsx
+      TutorProfileForm.tsx
+      tutor-profile-form.ts
+    resources/
+      ResourceCard.tsx
+      ResourceFilters.tsx
+      ResourceArticleView.tsx
+      ArticleForm.tsx
+    enquiries/
+      EnquiryForm.tsx
+      TutorSelect.tsx
+    workspace/
+      WorkspaceStatus.tsx
+      WorkspaceNavigation.tsx
+      AccountAssignmentForm.tsx
+  pages/
+    Home.tsx
+    TutorProfile.tsx
+    Resources.tsx
+    workspace/
+      Dashboard.tsx
+      Profile.tsx
+      Articles.tsx
+      Accounts.tsx
+```
+
+The highest-value frontend extractions would be:
+
+- A shared `TutorProfileForm`
+- A shared `ArticleForm`
+- A reusable publish/draft status component
+- Shared mutation success/error handling
+- Shared loading, empty, and error states
+- A typed enquiry tutor option rather than the current unsafe cast pattern
+
+The pages should compose these components instead of containing the form field definitions, submission logic, status messaging, and layout all together.
+
+## 7. Separate seed data from seed logic
+
+The development seed file currently combines a large body of tutor/resource content with the database insertion procedure. I would split it into:
+
+```text
+api-server/src/seed/
+  seed-content.ts
+  seed-tutors.ts
+  seed-resources.ts
+  seed-data.ts
+```
+
+That makes the sample content easy to review or replace without touching the seeding algorithm. It also makes it possible to test seeding independently and keep production code unaware of fixture details.
+
+## 8. Make tests service-focused
+
+The current lifecycle tests exercise important behavior, but the profile lifecycle is coupled to shared database state, particularly tutor accent availability. I would add isolated tests around the extracted services:
+
+- Workspace account provisioning
+- Pending-to-approved transitions
+- Tutor assignment
+- Profile draft preservation
+- Profile publishing validation
+- Article publishing validation
+- Public visibility rules
+- Archived tutor behavior
+
+The route tests would then only need to verify authentication, status codes, and response shapes. The business rules would be tested without requiring a full shared database setup.
+
+## 9. Remove or isolate non-runtime material
+
+I would also clarify what belongs to the production application:
+
+- Keep generated API clients, but mark them clearly as generated and never edit them manually.
+- Move the `mockup-sandbox` out of the main runtime workspace if it is no longer used.
+- Exclude generated `dist` output and build metadata from the source review surface.
+- Add a short architecture README with the public flow, workspace roles, and publishing rules.
+
+## Recommended order
+
+I would do this incrementally:
+
+1. Add characterization tests around the existing public and workspace behavior.
+2. Extract presenters and shared validation functions.
+3. Extract workspace authorization/account provisioning.
+4. Split `workspace.ts` into route modules.
+5. Move profile and article logic into services.
+6. Refactor the large workspace forms into feature components.
+7. Separate seed data and remove unused prototype material.
+8. Only then consider small schema cleanup or migrations.
+
+That sequence keeps the same URLs, roles, database behavior, and publishing semantics while reducing the most expensive maintenance point: having to edit one large route file or page and worry about breaking unrelated parts of the application.
