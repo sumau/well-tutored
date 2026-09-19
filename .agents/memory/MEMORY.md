@@ -1,0 +1,1 @@
+- [Clerk test isolation](clerk-test-isolation.md) — stub the shared user API prototype because the client accessor can return transient objects.

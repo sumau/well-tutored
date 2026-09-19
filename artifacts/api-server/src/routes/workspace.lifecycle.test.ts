@@ -32,7 +32,10 @@ const clerkEmailByUserId = new Map<string, string>([
   [autoProvisionUserId, "auto-provision@example.test"],
   [ownerAliasUserId, "lifecycle-owner@example.test"],
 ]);
-const originalGetUser = clerkClient.users.getUser;
+const clerkUsersPrototype = Object.getPrototypeOf(clerkClient.users) as {
+  getUser: typeof clerkClient.users.getUser;
+};
+const originalGetUser = clerkUsersPrototype.getUser;
 
 type TestServer = {
   app: Express;
@@ -96,7 +99,7 @@ const tutorInput = {
 };
 
 before(async () => {
-  clerkClient.users.getUser = (async (userId: string) => {
+  clerkUsersPrototype.getUser = (async (userId: string) => {
     const email = clerkEmailByUserId.get(userId) ?? `${userId}@example.test`;
     const emailAddressId = `${userId}-primary-email`;
     return {
@@ -192,7 +195,7 @@ before(async () => {
 });
 
 after(async () => {
-  clerkClient.users.getUser = originalGetUser;
+  clerkUsersPrototype.getUser = originalGetUser;
   await db
     .delete(resourcesTable)
     .where(
