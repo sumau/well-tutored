@@ -36,6 +36,11 @@ type RenderedForm = {
   dom: JSDOM;
 };
 
+type RenderFormOptions = {
+  tutor?: Tutor;
+  tutors?: Tutor[];
+};
+
 function installDom() {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", {
     url: "http://localhost/",
@@ -50,6 +55,7 @@ function installDom() {
     HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
     Node: dom.window.Node,
     Event: dom.window.Event,
+    KeyboardEvent: dom.window.KeyboardEvent,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
   Object.defineProperty(globalThis, "navigator", {
@@ -68,7 +74,7 @@ function installDom() {
   return dom;
 }
 
-async function renderForm(): Promise<RenderedForm> {
+async function renderForm(options: RenderFormOptions = {}): Promise<RenderedForm> {
   const dom = installDom();
   const [{ createRoot }, { EnquiryForm }] = await Promise.all([
     import("react-dom/client"),
@@ -87,7 +93,10 @@ async function renderForm(): Promise<RenderedForm> {
   await act(async () => {
     root.render(
       <QueryClientProvider client={queryClient}>
-        <EnquiryForm tutor={tutor} />
+        <EnquiryForm
+          tutor={Object.prototype.hasOwnProperty.call(options, "tutor") ? options.tutor : tutor}
+          tutors={options.tutors}
+        />
       </QueryClientProvider>,
     );
   });
@@ -106,6 +115,24 @@ async function cleanupForm({ container, root, queryClient, dom }: RenderedForm) 
 
 function submitForm(form: HTMLFormElement) {
   form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
+function submitWithKeyboard(form: HTMLFormElement, button: HTMLButtonElement) {
+  button.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Enter",
+    code: "Enter",
+    bubbles: true,
+  }));
+  form.requestSubmit(button);
+}
+
+function tabToNext(current: HTMLElement, next: HTMLElement) {
+  current.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Tab",
+    code: "Tab",
+    bubbles: true,
+  }));
+  next.focus();
 }
 
 function setFieldValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -187,6 +214,115 @@ test("invalid email and short message errors are announced and tied to their fie
   assert.equal(messageError.textContent, "Use at least 10 characters so the tutor has useful context.");
 
   await cleanupForm(rendered);
+});
+
+test("keyboard users can complete an enquiry, recover validation focus, and reach the success receipt", async () => {
+  const rendered = await renderForm({ tutor: undefined, tutors: [tutor] });
+  const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
+  const controls = Array.from(
+    form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>(
+      "input, select, textarea, button[type=submit]",
+    ),
+  );
+  const expectedIds = [
+    "enquiry-parent-name",
+    "enquiry-parent-email",
+    "enquiry-tutor",
+    "enquiry-student-name",
+    "enquiry-student-age",
+    "enquiry-subject-level",
+    "enquiry-message",
+    "button-submit-enquiry",
+  ];
+
+  assert.deepEqual(controls.map((control) => control.id || control.dataset.testid), expectedIds);
+
+  const values = [
+    "Eleanor James",
+    "eleanor@example.com",
+    "alice-smith",
+    "Maya",
+    "13-15",
+    "GCSE English Literature",
+    "Maya would benefit from essay planning support.",
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: 42,
+        tutorName: "Alice Smith",
+        receivedAt: "2026-09-19T12:00:00.000Z",
+        deliveryStatus: "delivered",
+        message: "Your enquiry has been sent securely.",
+      }),
+      {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    for (let index = 0; index < controls.length - 1; index += 1) {
+      const control = controls[index];
+      await act(async () => {
+        if (index === 0) {
+          control.focus();
+        } else {
+          tabToNext(controls[index - 1], control);
+        }
+        setFieldValue(control as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, values[index]);
+      });
+      assert.equal(document.activeElement, control);
+    }
+
+    const email = rendered.container.querySelector<HTMLInputElement>("#enquiry-parent-email")!;
+    await act(async () => {
+      setFieldValue(email, "not-an-email");
+      submitForm(form);
+    });
+    assert.equal(document.activeElement, email);
+    assert.equal(email.getAttribute("aria-invalid"), "true");
+    assert.equal(email.getAttribute("aria-describedby"), "enquiry-parent-email-error");
+
+    const tutorSelect = rendered.container.querySelector<HTMLSelectElement>("#enquiry-tutor")!;
+    await act(async () => {
+      setFieldValue(email, "eleanor@example.com");
+      tabToNext(email, tutorSelect);
+    });
+    assert.equal(document.activeElement, tutorSelect);
+
+    const controlsAfterRecovery = Array.from(
+      form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>(
+        "input, select, textarea, button[type=submit]",
+      ),
+    );
+    for (let index = 3; index < controlsAfterRecovery.length - 1; index += 1) {
+      const control = controlsAfterRecovery[index];
+      await act(async () => {
+        tabToNext(controlsAfterRecovery[index - 1], control);
+      });
+      assert.equal(document.activeElement, control);
+    }
+
+    const submitButton = rendered.container.querySelector<HTMLButtonElement>("[data-testid=button-submit-enquiry]")!;
+    assert.equal(submitButton.disabled, false);
+    await act(async () => {
+      tabToNext(controlsAfterRecovery[6], submitButton);
+      submitWithKeyboard(form, submitButton);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const receipt = rendered.container.querySelector("[data-testid=enquiry-success]")!;
+    assert.equal(document.activeElement, receipt);
+    assert.equal(receipt.getAttribute("role"), "status");
+    assert.equal(receipt.getAttribute("aria-live"), "polite");
+    assert.match(receipt.textContent ?? "", /Message delivered/);
+    assert.match(receipt.textContent ?? "", /Your enquiry has been sent securely\./);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await cleanupForm(rendered);
+  }
 });
 
 test("a failed submission keeps an announced form error and a successful retry focuses the receipt", async () => {
