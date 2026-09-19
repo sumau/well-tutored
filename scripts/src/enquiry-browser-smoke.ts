@@ -56,6 +56,124 @@ async function fillFocused(
   await page.keyboard.insertText(value);
 }
 
+async function expectSuccessfulReceipt(
+  page: Page,
+  timeoutMs: number,
+) {
+  const receipt = page.locator("[data-testid=enquiry-success]");
+  await receipt.waitFor({ state: "visible", timeout: timeoutMs });
+  if ((await receipt.getAttribute("role")) !== "status") {
+    throw new BrowserSmokeCheckError("The success receipt is not a status announcement.");
+  }
+  if ((await receipt.getAttribute("aria-live")) !== "polite") {
+    throw new BrowserSmokeCheckError("The success receipt is not announced politely.");
+  }
+  if (!(await receipt.innerText()).includes("Your enquiry has been sent securely.")) {
+    throw new BrowserSmokeCheckError(
+      "The success receipt did not contain the delivery confirmation.",
+    );
+  }
+  await expectActive(page, "enquiry-success");
+}
+
+async function publishedAcceptingTutor(
+  page: Page,
+  baseUrl: URL,
+  timeoutMs: number,
+) {
+  const response = await page.request.get(
+    new URL("/api/tutors", baseUrl).toString(),
+    { timeout: timeoutMs },
+  );
+  if (!response.ok()) {
+    throw new BrowserSmokeCheckError(
+      `Could not load published tutors before the profile check (HTTP ${response.status()}).`,
+    );
+  }
+
+  const tutors: unknown = await response.json();
+  if (!Array.isArray(tutors)) {
+    throw new BrowserSmokeCheckError(
+      "The published tutor catalogue was not an array.",
+    );
+  }
+
+  const tutor = tutors.find(
+    (candidate): candidate is { slug: string; name: string } =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      typeof (candidate as { slug?: unknown }).slug === "string" &&
+      typeof (candidate as { name?: unknown }).name === "string" &&
+      (candidate as { availability?: unknown }).availability !== "unavailable",
+  );
+  if (!tutor) {
+    throw new BrowserSmokeCheckError(
+      "The published tutor catalogue did not contain an accepting tutor profile.",
+    );
+  }
+  return tutor;
+}
+
+async function runTutorProfileSmokeCheck(
+  page: Page,
+  baseUrl: URL,
+  timeoutMs: number,
+) {
+  const tutor = await publishedAcceptingTutor(page, baseUrl, timeoutMs);
+  await page.goto(
+    new URL(
+      `/tutors/${encodeURIComponent(tutor.slug)}#enquire`,
+      baseUrl,
+    ).toString(),
+    {
+      waitUntil: "domcontentloaded",
+      timeout: timeoutMs,
+    },
+  );
+  await page.locator("[data-testid=enquiry-form]").waitFor({
+    state: "visible",
+    timeout: timeoutMs,
+  });
+
+  if (await page.locator("#enquiry-tutor").count() !== 0) {
+    throw new BrowserSmokeCheckError(
+      "The tutor profile enquiry unexpectedly rendered a tutor selector.",
+    );
+  }
+
+  await tabUntil(page, "enquiry-parent-name", timeoutMs);
+  await fillFocused(page, "Eleanor James");
+  await tabTo(page, "enquiry-parent-email");
+  await fillFocused(page, "eleanor@example.com");
+  await tabTo(page, "enquiry-student-name");
+  await fillFocused(page, "Maya");
+  await tabTo(page, "enquiry-student-age");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  if (
+    await page.locator("#enquiry-student-age").inputValue() !== "13-15"
+  ) {
+    throw new BrowserSmokeCheckError(
+      "Keyboard selection did not choose the student's age on the tutor profile.",
+    );
+  }
+  await tabTo(page, "enquiry-subject-level");
+  await fillFocused(page, "GCSE English Literature");
+  await tabTo(page, "enquiry-message");
+  await fillFocused(page, "Maya would benefit from essay planning support.");
+  await tabTo(page, "button-submit-enquiry");
+
+  if (await page.locator("[data-testid=button-submit-enquiry]").isDisabled()) {
+    throw new BrowserSmokeCheckError(
+      "The completed tutor profile enquiry remained disabled at the submission step.",
+    );
+  }
+  await page.keyboard.press("Enter");
+  await expectSuccessfulReceipt(page, timeoutMs);
+
+  console.log(`  ✓ tutor profile keyboard enquiry for ${tutor.name}`);
+}
+
 async function runBrowserSmokeCheck() {
   const baseUrl = resolveBaseUrl();
   const timeoutMs = resolveTimeoutMs();
@@ -166,25 +284,15 @@ async function runBrowserSmokeCheck() {
     }
     await page.keyboard.press("Enter");
 
-    const receipt = page.locator("[data-testid=enquiry-success]");
-    await receipt.waitFor({ state: "visible", timeout: timeoutMs });
-    if ((await receipt.getAttribute("role")) !== "status") {
-      throw new BrowserSmokeCheckError("The success receipt is not a status announcement.");
-    }
-    if ((await receipt.getAttribute("aria-live")) !== "polite") {
-      throw new BrowserSmokeCheckError("The success receipt is not announced politely.");
-    }
-    if (!(await receipt.innerText()).includes("Your enquiry has been sent securely.")) {
-      throw new BrowserSmokeCheckError(
-        "The success receipt did not contain the delivery confirmation.",
-      );
-    }
-    await expectActive(page, "enquiry-success");
+    await expectSuccessfulReceipt(page, timeoutMs);
+
+    await runTutorProfileSmokeCheck(page, baseUrl, timeoutMs);
 
     console.log(`Enquiry keyboard smoke check passed for ${baseUrl.origin}`);
     console.log("  ✓ native Tab order and disabled-submit behavior");
     console.log("  ✓ Enter validation recovery");
-    console.log("  ✓ keyboard submission and announced success receipt");
+    console.log("  ✓ standalone keyboard submission and announced success receipt");
+    console.log("  ✓ preselected-tutor profile submission and announced success receipt");
   } finally {
     await browser.close();
   }

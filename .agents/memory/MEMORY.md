@@ -1,3 +1,4 @@
 - [Clerk test isolation](clerk-test-isolation.md) — stub the shared user API prototype because the client accessor can return transient objects.
+- [Local browser smoke routing](local-browser-smoke-routing.md) — use the proxied development domain for browser checks; direct Vite ports do not proxy `/api`.
 - [Replit publish smoke validation](replit-publish-smoke-validation.md) — post-publish checks need an explicit lifecycle integration and newly published URL.
 - [Web artifact component tests](web-artifact-component-tests.md) — run tsx tests with the web app tsconfig when importing @ aliases and JSX components.
