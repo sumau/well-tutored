@@ -74,6 +74,66 @@ export function workspaceSignedOutRedirect() {
   return routePaths.auth.signIn.replace("/*?", "");
 }
 
+export type RouteMetadata = {
+  title: string;
+  description: string;
+};
+
+const defaultRouteMetadata: RouteMetadata = {
+  title: "Well Tutored | Women tutors for secondary and A-level students",
+  description:
+    "Browse women tutors educated at Russell Group universities, read their subject resources and submit a named-tutor enquiry.",
+};
+
+function humanizeSlug(value: string) {
+  return value
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+export function routeMetadataForPath(pathname: string): RouteMetadata {
+  if (pathname === routePaths.public.resources) {
+    return {
+      title: "Insights & Resources | Well Tutored",
+      description:
+        "Read illustrative guides, revision notes and subject resources from Well Tutored tutors.",
+    };
+  }
+
+  if (pathname.startsWith("/resources/")) {
+    return {
+      title: `${humanizeSlug(pathname.replace("/resources/", ""))} | Well Tutored Resources`,
+      description: "Read an illustrative tutor-written resource from Well Tutored.",
+    };
+  }
+
+  if (pathname.startsWith("/tutors/")) {
+    return {
+      title: `${humanizeSlug(pathname.replace("/tutors/", ""))} | Well Tutored`,
+      description:
+        "View this tutor’s subject expertise, qualifications, teaching style and named-tutor enquiry form.",
+    };
+  }
+
+  if (pathname === routePaths.public.enquiry) {
+    return {
+      title: "Make an Enquiry | Well Tutored",
+      description:
+        "Tell Well Tutored which tutor you are interested in and what support would help.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace")) {
+    return {
+      title: "Workspace | Well Tutored",
+      description: "Shared workspace for tutor profiles and resources.",
+    };
+  }
+
+  return defaultRouteMetadata;
+}
+
 export type RouteResolution =
   | { kind: "page"; page: string }
   | { kind: "redirect"; to: string };

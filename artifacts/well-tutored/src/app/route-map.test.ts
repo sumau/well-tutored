@@ -4,6 +4,7 @@ import {
   authRouteDefinitions,
   legacyWorkspaceResourcePath,
   publicRouteDefinitions,
+  routeMetadataForPath,
   resolveRoute,
   routePaths,
   workspaceRouteDefinitions,
@@ -31,6 +32,49 @@ test("keeps public pages on their expected route map", () => {
     kind: "page",
     page: "ResourceDetail",
   });
+});
+
+test("keeps page metadata aligned with public and workspace routes", () => {
+  const expectedMetadata = [
+    {
+      path: "/",
+      title: "Well Tutored | Women tutors for secondary and A-level students",
+      description:
+        "Browse women tutors educated at Russell Group universities, read their subject resources and submit a named-tutor enquiry.",
+    },
+    {
+      path: "/resources",
+      title: "Insights & Resources | Well Tutored",
+      description:
+        "Read illustrative guides, revision notes and subject resources from Well Tutored tutors.",
+    },
+    {
+      path: "/resources/essay-planning",
+      title: "Essay Planning | Well Tutored Resources",
+      description: "Read an illustrative tutor-written resource from Well Tutored.",
+    },
+    {
+      path: "/tutors/alice-smith",
+      title: "Alice Smith | Well Tutored",
+      description:
+        "View this tutor’s subject expertise, qualifications, teaching style and named-tutor enquiry form.",
+    },
+    {
+      path: "/enquire",
+      title: "Make an Enquiry | Well Tutored",
+      description:
+        "Tell Well Tutored which tutor you are interested in and what support would help.",
+    },
+    {
+      path: "/workspace/resources/42",
+      title: "Workspace | Well Tutored",
+      description: "Shared workspace for tutor profiles and resources.",
+    },
+  ];
+
+  for (const { path, ...metadata } of expectedMetadata) {
+    assert.deepEqual(routeMetadataForPath(path), metadata);
+  }
 });
 
 test("keeps Clerk callback wildcard routes available", () => {
