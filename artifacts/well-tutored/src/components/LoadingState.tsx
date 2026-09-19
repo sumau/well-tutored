@@ -1,6 +1,6 @@
 export function LoadingState({ message = "Loading..." }: { message?: string }) {
   return (
-    <div className="flex-1 min-h-[420px] flex flex-col justify-center py-20 px-6" data-testid="loading-state">
+    <div className="flex-1 min-h-[420px] flex flex-col justify-center py-20 px-6" data-testid="loading-state" role="status" aria-live="polite" aria-busy="true">
       <div className="max-w-[1150px] w-full mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-10 items-end mb-14">
           <div className="space-y-4">

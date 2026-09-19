@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Bookmark, Clock3, List, Printer, Share2 } from "lucide-react";
+import { ArrowRight, Bookmark, Clock3, List, Printer, Share2 } from "lucide-react";
 import { useState } from "react";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
@@ -117,7 +117,9 @@ export default function ResourceDetail() {
   };
 
   const jumpTo = (id: string) => {
-    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth" });
+    const target = document.getElementById(`section-${id}`);
+    target?.scrollIntoView({ behavior: "smooth" });
+    target?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
   };
 
   if (isLoading) return <LoadingState message="Loading resource..." />;
@@ -126,14 +128,15 @@ export default function ResourceDetail() {
   return (
     <main className="flex-1" data-testid={`page-resource-${resource.slug}`}>
       <article className="max-w-[1150px] mx-auto px-6 md:px-[28px] pt-[42px] md:pt-[62px] pb-[80px] md:pb-[100px]">
-        {/* Breadcrumb */}
-        <div className="text-[11px] text-muted-foreground flex items-center gap-[7px] mb-[30px] md:mb-[45px] font-medium">
-          <Link href="/" className="hover:text-primary transition-colors">Home</Link>
-          <span>/</span>
-          <Link href="/resources" className="hover:text-primary transition-colors">Resources</Link>
-          <span>/</span>
-          <span className="text-foreground">{resource.subject}</span>
-        </div>
+        <nav aria-label="Breadcrumb" className="mb-[30px] md:mb-[45px]">
+          <ol className="text-[11px] text-muted-foreground flex items-center gap-[7px] font-medium">
+            <li><Link href="/" className="hover:text-primary transition-colors">Home</Link></li>
+            <li aria-hidden="true">/</li>
+            <li><Link href="/resources" className="hover:text-primary transition-colors">Resources</Link></li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page" className="text-foreground">{resource.subject}</li>
+          </ol>
+        </nav>
 
         {/* Hero */}
         <header className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_285px] gap-[40px] md:gap-[75px] items-end pb-[40px] md:pb-[58px] border-b border-border">
@@ -229,8 +232,8 @@ export default function ResourceDetail() {
             </p>
 
             {resource.sections.map(section => (
-              <div key={section.id} id={`section-${section.id}`} className="mt-[48px] scroll-mt-24">
-                <h2 className="font-serif text-[32px] md:text-[36px] leading-[1.1] tracking-tight mb-[20px] text-foreground">
+              <div key={section.id} id={`section-${section.id}`} className="mt-[48px] scroll-mt-24" aria-labelledby={`section-heading-${section.id}`}>
+                <h2 id={`section-heading-${section.id}`} tabIndex={-1} className="font-serif text-[32px] md:text-[36px] leading-[1.1] tracking-tight mb-[20px] text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   {section.heading}
                 </h2>
                 <p className="mb-[25px] leading-[1.8] text-foreground">

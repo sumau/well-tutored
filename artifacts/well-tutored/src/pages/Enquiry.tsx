@@ -38,13 +38,13 @@ export default function Enquiry() {
     <main className="flex-1" data-testid="page-enquiry">
       <section className="bg-secondary px-6 md:px-[30px] pt-[48px] md:pt-[72px] pb-[54px] md:pb-[72px]">
         <div className="max-w-[1150px] mx-auto">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-muted-foreground hover:text-primary transition-colors mb-[44px]"
-            data-testid="enquiry-back-link"
-          >
-            <ArrowLeft size={13} /> Back to the tutors
-          </Link>
+          <nav aria-label="Breadcrumb" className="mb-[44px]">
+            <ol className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
+              <li><Link href="/" className="hover:text-primary transition-colors" data-testid="enquiry-back-link">Back to the tutors</Link></li>
+              <li aria-hidden="true">/</li>
+              <li aria-current="page" className="text-foreground">Enquiry</li>
+            </ol>
+          </nav>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr_330px] gap-[40px] md:gap-[70px] items-end">
             <div>
@@ -81,7 +81,7 @@ export default function Enquiry() {
         </div>
       </section>
 
-      <section className="px-6 md:px-[30px] py-[56px] md:py-[82px]">
+      <section className="px-6 md:px-[30px] py-[56px] md:py-[82px]" aria-labelledby="enquiry-form-title">
         <div className="max-w-[1150px] mx-auto grid grid-cols-1 md:grid-cols-[0.82fr_1.18fr] gap-[40px] md:gap-[85px] items-start">
           <div className="md:pt-[18px]">
             <span className="block uppercase tracking-[0.17em] text-[10px] font-bold text-primary mb-4">

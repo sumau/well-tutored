@@ -20,7 +20,9 @@ export default function Home() {
   const { data: tutors, isLoading: tutorsLoading, error: tutorsError, refetch: refetchTutors } = useListTutors();
 
   const handleJump = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ behavior: "smooth" });
+    target?.focus({ preventScroll: true });
   };
 
   if (tutorsLoading) return <LoadingState />;
@@ -29,12 +31,12 @@ export default function Home() {
   return (
     <main className="flex-1" data-testid="page-home">
       {/* Hero Section */}
-      <section className="max-w-[1210px] mx-auto px-6 md:px-[30px] pt-[48px] md:pt-[72px] pb-[64px] md:pb-[82px] grid grid-cols-1 md:grid-cols-[1fr_330px] gap-[40px] md:gap-[70px] items-end" id="top">
+      <section aria-labelledby="home-hero-title" className="max-w-[1210px] mx-auto px-6 md:px-[30px] pt-[48px] md:pt-[72px] pb-[64px] md:pb-[82px] grid grid-cols-1 md:grid-cols-[1fr_330px] gap-[40px] md:gap-[70px] items-end" id="top">
         <div>
           <span className="block uppercase tracking-[0.17em] text-[10px] font-bold text-primary mb-4" data-testid="hero-kicker">
             A boutique tutoring agency for young women
           </span>
-          <h1 className="font-serif text-[clamp(48px,6vw,84px)] leading-[0.91] tracking-tight mb-[25px]" data-testid="hero-title">
+          <h1 id="home-hero-title" className="font-serif text-[clamp(48px,6vw,84px)] leading-[0.91] tracking-tight mb-[25px]" data-testid="hero-title">
             Academic excellence,<br /><em>personalised for her.</em>
           </h1>
           <p className="max-w-[610px] text-muted-foreground text-[16px] leading-[1.65] mb-[30px]" data-testid="hero-copy">
@@ -57,12 +59,12 @@ export default function Home() {
       </section>
 
       {/* Tutors Section */}
-      <section className="bg-secondary px-6 md:px-[30px] py-[64px] md:py-[82px]" id="tutors">
+      <section className="bg-secondary px-6 md:px-[30px] py-[64px] md:py-[82px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary" id="tutors" tabIndex={-1} aria-labelledby="home-tutors-title">
         <div className="max-w-[1150px] mx-auto">
           <div className="flex flex-col md:flex-row justify-between md:items-end gap-[20px] md:gap-[40px] mb-[42px]">
             <div>
               <span className="block uppercase tracking-[0.17em] text-[10px] font-bold text-primary mb-4">Meet our tutors</span>
-              <h2 className="font-serif text-[clamp(43px,5vw,68px)] leading-[0.91] tracking-tight m-0">
+              <h2 id="home-tutors-title" className="font-serif text-[clamp(43px,5vw,68px)] leading-[0.91] tracking-tight m-0">
                 People, not<br /><em>profiles.</em>
               </h2>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCreateEnquiry, type EnquiryReceipt } from "@workspace/api-client-react";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import type { Tutor } from "@workspace/api-client-react";
@@ -13,6 +13,10 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
   const createEnquiry = useCreateEnquiry();
   const [receipt, setReceipt] = useState<EnquiryReceipt | null>(null);
   const [submitError, setSubmitError] = useState("");
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({});
 
   const [form, setForm] = useState({
     name: "",
@@ -26,21 +30,50 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
 
   const update = (key: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
+    setSubmitError("");
   };
 
-  const isComplete = Boolean(
-    form.name.trim() && 
-    form.email.trim() && 
-    form.tutorSlug && 
-    form.studentName.trim() && 
-    form.studentAge &&
-    form.subjectLevel.trim() &&
-    form.message.trim().length >= 10
-  );
+  const errors: Record<string, string> = {};
+  if (!form.name.trim()) errors.name = "Enter the parent or guardian's name.";
+  if (!form.email.trim()) {
+    errors.email = "Enter an email address.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    errors.email = "Enter a valid email address.";
+  }
+  if (!form.tutorSlug) errors.tutorSlug = "Choose a tutor.";
+  if (!form.studentName.trim()) errors.studentName = "Enter the student's name.";
+  if (!form.studentAge) errors.studentAge = "Choose the student's age.";
+  if (!form.subjectLevel.trim()) errors.subjectLevel = "Enter the subject and level.";
+  if (!form.message.trim()) {
+    errors.message = "Tell us a little about what support would help.";
+  } else if (form.message.trim().length < 10) {
+    errors.message = "Use at least 10 characters so the tutor has useful context.";
+  }
+
+  const isComplete = Object.keys(errors).length === 0;
+  const showError = (key: string) => Boolean(errors[key] && (attemptedSubmit || touched[key]));
+  const markTouched = (key: string) => {
+    setTouched(prev => ({ ...prev, [key]: true }));
+  };
+
+  useEffect(() => {
+    if (receipt) {
+      receiptRef.current?.focus();
+    }
+  }, [receipt]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isComplete || createEnquiry.isPending) return;
+    setAttemptedSubmit(true);
+    setTouched(Object.keys(form).reduce<Record<string, boolean>>((result, key) => {
+      result[key] = true;
+      return result;
+    }, {}));
+    if (!isComplete || createEnquiry.isPending) {
+      const firstInvalid = Object.keys(errors).find((key) => errors[key]);
+      if (firstInvalid) fieldRefs.current[firstInvalid]?.focus();
+      return;
+    }
     setSubmitError("");
 
     createEnquiry.mutate({
@@ -57,6 +90,8 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
           subjectLevel: "",
           message: ""
         });
+        setAttemptedSubmit(false);
+        setTouched({});
       },
       onError: () => {
         setSubmitError("We could not record your enquiry. Please check the details and try again.");
@@ -66,7 +101,14 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
 
   if (receipt) {
     return (
-      <div className={`text-center py-10 px-4 ${compact ? 'bg-card' : ''}`} data-testid="enquiry-success">
+      <div
+        ref={receiptRef}
+        className={`text-center py-10 px-4 ${compact ? 'bg-card' : ''}`}
+        data-testid="enquiry-success"
+        role="status"
+        aria-live="polite"
+        tabIndex={-1}
+      >
         <div className={`w-[50px] h-[50px] ${receipt.deliveryStatus === "delivered" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground"} rounded-full flex items-center justify-center mx-auto mb-6`}>
           <Check size={24} />
         </div>
@@ -109,7 +151,7 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
         </div>
       ) : (
         <div className="mb-8">
-          <h2 className="font-serif text-[38px] md:text-[48px] tracking-tight leading-[0.95] mb-3 text-foreground">
+           <h2 id={compact ? undefined : "enquiry-form-title"} className="font-serif text-[38px] md:text-[48px] tracking-tight leading-[0.95] mb-3 text-foreground">
             Ask about<br /><em>{tutor ? tutor.name.split(' ')[0] : 'a tutor'}.</em>
           </h2>
           <p className="text-muted-foreground text-[14px] leading-[1.6]">
@@ -118,43 +160,72 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" data-testid="enquiry-form">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+        data-testid="enquiry-form"
+        noValidate
+        aria-describedby="enquiry-form-instructions"
+      >
+        <p id="enquiry-form-instructions" className="text-[11px] text-muted-foreground leading-[1.5]">
+          Fields marked with an asterisk are required. We will use these details only to respond to this enquiry.
+        </p>
         {/* Parent Details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+          <label htmlFor="enquiry-parent-name" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
             Parent or guardian name *
             <input 
-              required
+              id="enquiry-parent-name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              ref={(element) => { fieldRefs.current.name = element; }}
               className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors"
               placeholder="e.g. Eleanor James"
               value={form.name}
               onChange={e => update("name", e.target.value)}
+              onBlur={() => markTouched("name")}
+              aria-invalid={showError("name")}
+              aria-describedby={showError("name") ? "enquiry-parent-name-error" : undefined}
               data-testid="input-parent-name"
             />
+            {showError("name") && <span id="enquiry-parent-name-error" className="font-normal text-destructive" role="alert">{errors.name}</span>}
           </label>
-          <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+          <label htmlFor="enquiry-parent-email" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
             Email address *
             <input 
-              required
+              id="enquiry-parent-email"
+              name="email"
               type="email"
+              autoComplete="email"
+              ref={(element) => { fieldRefs.current.email = element; }}
               className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors"
               placeholder="you@example.com"
               value={form.email}
               onChange={e => update("email", e.target.value)}
+              onBlur={() => markTouched("email")}
+              aria-invalid={showError("email")}
+              aria-describedby={showError("email") ? "enquiry-parent-email-error" : undefined}
               data-testid="input-parent-email"
             />
+            {showError("email") && <span id="enquiry-parent-email-error" className="font-normal text-destructive" role="alert">{errors.email}</span>}
           </label>
         </div>
 
         {/* Tutor Selection (if not pre-selected) */}
         {!tutor && tutors.length > 0 && (
-          <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+          <label htmlFor="enquiry-tutor" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
             Tutor you are interested in *
             <select
-              required
+              id="enquiry-tutor"
+              name="tutorSlug"
+              ref={(element) => { fieldRefs.current.tutorSlug = element; }}
               className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors appearance-none"
               value={form.tutorSlug}
               onChange={e => update("tutorSlug", e.target.value)}
+              onBlur={() => markTouched("tutorSlug")}
+              aria-invalid={showError("tutorSlug")}
+              aria-describedby={showError("tutorSlug") ? "enquiry-tutor-error" : undefined}
               data-testid="input-tutor-select"
             >
               <option value="">Select a tutor</option>
@@ -162,29 +233,43 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
                 <option key={t.slug} value={t.slug}>{t.name} ({t.subject})</option>
               ))}
             </select>
+            {showError("tutorSlug") && <span id="enquiry-tutor-error" className="font-normal text-destructive" role="alert">{errors.tutorSlug}</span>}
           </label>
         )}
 
         {/* Student Details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+          <label htmlFor="enquiry-student-name" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
             Student's name *
             <input 
-              required
+              id="enquiry-student-name"
+              name="studentName"
+              type="text"
+              autoComplete="section-student name"
+              ref={(element) => { fieldRefs.current.studentName = element; }}
               className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors"
               placeholder="First name"
               value={form.studentName}
               onChange={e => update("studentName", e.target.value)}
+              onBlur={() => markTouched("studentName")}
+              aria-invalid={showError("studentName")}
+              aria-describedby={showError("studentName") ? "enquiry-student-name-error" : undefined}
               data-testid="input-student-name"
             />
+            {showError("studentName") && <span id="enquiry-student-name-error" className="font-normal text-destructive" role="alert">{errors.studentName}</span>}
           </label>
-          <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+          <label htmlFor="enquiry-student-age" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
             Student's age *
             <select
-              required
+              id="enquiry-student-age"
+              name="studentAge"
+              ref={(element) => { fieldRefs.current.studentAge = element; }}
               className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors appearance-none"
               value={form.studentAge}
               onChange={e => update("studentAge", e.target.value)}
+              onBlur={() => markTouched("studentAge")}
+              aria-invalid={showError("studentAge")}
+              aria-describedby={showError("studentAge") ? "enquiry-student-age-error" : undefined}
               data-testid="input-student-age"
             >
               <option value="">Select</option>
@@ -193,32 +278,48 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
               <option value="16-17">16–17</option>
               <option value="18+">18+</option>
             </select>
+            {showError("studentAge") && <span id="enquiry-student-age-error" className="font-normal text-destructive" role="alert">{errors.studentAge}</span>}
           </label>
         </div>
 
-        <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+        <label htmlFor="enquiry-subject-level" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
           Subject and level *
           <input 
-            required
+            id="enquiry-subject-level"
+            name="subjectLevel"
+            type="text"
+            autoComplete="off"
+            ref={(element) => { fieldRefs.current.subjectLevel = element; }}
             className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors"
             placeholder="e.g. GCSE English Literature"
             value={form.subjectLevel}
             onChange={e => update("subjectLevel", e.target.value)}
+            onBlur={() => markTouched("subjectLevel")}
+            aria-invalid={showError("subjectLevel")}
+            aria-describedby={showError("subjectLevel") ? "enquiry-subject-level-error" : undefined}
             data-testid="input-subject-level"
           />
+          {showError("subjectLevel") && <span id="enquiry-subject-level-error" className="font-normal text-destructive" role="alert">{errors.subjectLevel}</span>}
         </label>
 
-        <label className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
+        <label htmlFor="enquiry-message" className="flex flex-col gap-1.5 text-[11px] font-bold text-foreground">
           What would you like the tutor to know? *
           <textarea 
-            required
+            id="enquiry-message"
+            name="message"
+            autoComplete="off"
+            ref={(element) => { fieldRefs.current.message = element; }}
             rows={4}
             className="border border-border bg-background px-3 py-3 text-[13px] font-normal text-foreground focus:border-primary outline-none transition-colors resize-none"
             placeholder="A little about what the student is working on, and what support might feel useful... (min 10 characters)"
             value={form.message}
             onChange={e => update("message", e.target.value)}
+            onBlur={() => markTouched("message")}
+            aria-invalid={showError("message")}
+            aria-describedby={showError("message") ? "enquiry-message-error" : undefined}
             data-testid="input-message"
           />
+          {showError("message") && <span id="enquiry-message-error" className="font-normal text-destructive" role="alert">{errors.message}</span>}
         </label>
 
         {submitError && (
@@ -226,6 +327,10 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
             {submitError}
           </p>
         )}
+
+        <p aria-live="polite" role="status" className="sr-only">
+          {createEnquiry.isPending ? "Submitting your enquiry." : ""}
+        </p>
 
         <button 
           type="submit"

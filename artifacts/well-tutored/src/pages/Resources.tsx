@@ -161,8 +161,12 @@ export default function Resources() {
       <section
         className="px-6 md:px-[30px] py-[50px] md:py-[80px]"
         aria-live="polite"
+        aria-busy={fetching}
       >
         <div className="max-w-[1150px] mx-auto">
+          <p className="sr-only" role="status" aria-live="polite">
+            {fetching ? "Updating resources." : `${visible.length} resources shown.`}
+          </p>
           {visible.length > 0 ? (
             <>
               <div
