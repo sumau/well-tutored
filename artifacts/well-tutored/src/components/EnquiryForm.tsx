@@ -17,6 +17,7 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const receiptRef = useRef<HTMLDivElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
   const focusFirstFieldOnReset = useRef(false);
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({});
 
@@ -66,6 +67,12 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
       fieldRefs.current.name?.focus();
     }
   }, [receipt]);
+
+  useEffect(() => {
+    if (submitError) {
+      submitButtonRef.current?.focus();
+    }
+  }, [submitError]);
 
   const handleReset = () => {
     focusFirstFieldOnReset.current = true;
@@ -345,6 +352,7 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
 
         <button 
           type="submit"
+          ref={submitButtonRef}
           disabled={!isComplete || createEnquiry.isPending}
           className="mt-2 bg-foreground text-background text-[12px] font-bold px-6 py-4 hover:bg-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="button-submit-enquiry"

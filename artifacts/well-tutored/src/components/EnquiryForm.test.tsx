@@ -349,6 +349,7 @@ test("keyboard users can complete an enquiry, recover validation focus, and reac
 test("a failed submission keeps an announced form error and a successful retry focuses the receipt", async () => {
   const rendered = await renderForm();
   const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
+  const submitButton = rendered.container.querySelector<HTMLButtonElement>("[data-testid=button-submit-enquiry]")!;
   const originalFetch = globalThis.fetch;
   let requestCount = 0;
 
@@ -386,7 +387,8 @@ test("a failed submission keeps an announced form error and a successful retry f
     });
 
     await act(async () => {
-      submitForm(form);
+      submitButton.focus();
+      submitWithKeyboard(form, submitButton);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -398,9 +400,16 @@ test("a failed submission keeps an announced form error and a successful retry f
     );
     assert.equal(form.contains(submitError), true);
     assert.equal(rendered.container.querySelector("[data-testid=enquiry-success]"), null);
+    assert.equal(document.activeElement, submitButton);
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-parent-name")?.value, "Eleanor James");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-parent-email")?.value, "eleanor@example.com");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-student-name")?.value, "Maya");
+    assert.equal(rendered.container.querySelector<HTMLSelectElement>("#enquiry-student-age")?.value, "13-15");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-subject-level")?.value, "GCSE English Literature");
+    assert.equal(rendered.container.querySelector<HTMLTextAreaElement>("#enquiry-message")?.value, "Maya would benefit from essay planning support.");
 
     await act(async () => {
-      submitForm(form);
+      submitWithKeyboard(form, submitButton);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 

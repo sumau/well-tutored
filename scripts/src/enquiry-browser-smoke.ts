@@ -185,9 +185,22 @@ async function runBrowserSmokeCheck() {
 
   try {
     const page = await browser.newPage();
+    let interceptedEnquiryRequests = 0;
     await page.route("**/api/enquiries", async (route) => {
       if (route.request().method() !== "POST") {
         await route.continue();
+        return;
+      }
+
+      interceptedEnquiryRequests += 1;
+      if (interceptedEnquiryRequests === 1) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "The enquiry could not be recorded.",
+          }),
+        });
         return;
       }
 
@@ -284,13 +297,56 @@ async function runBrowserSmokeCheck() {
     }
     await page.keyboard.press("Enter");
 
+    const submitError = page.locator("[data-testid=error-enquiry-submit]");
+    await submitError.waitFor({ state: "visible", timeout: timeoutMs });
+    if ((await submitError.getAttribute("role")) !== "alert") {
+      throw new BrowserSmokeCheckError(
+        "The failed enquiry response did not announce a submission error.",
+      );
+    }
+    if (
+      (await submitError.innerText()) !==
+      "We could not record your enquiry. Please check the details and try again."
+    ) {
+      throw new BrowserSmokeCheckError(
+        "The failed enquiry response announced the wrong submission error.",
+      );
+    }
+    if (interceptedEnquiryRequests !== 1) {
+      throw new BrowserSmokeCheckError(
+        "The failed enquiry response unexpectedly created or retried production data.",
+      );
+    }
+    for (const [fieldId, expectedValue] of [
+      ["enquiry-parent-name", "Eleanor James"],
+      ["enquiry-parent-email", "eleanor@example.com"],
+      ["enquiry-tutor", await page.locator("#enquiry-tutor").inputValue()],
+      ["enquiry-student-name", "Maya"],
+      ["enquiry-student-age", "13-15"],
+      ["enquiry-subject-level", "GCSE English Literature"],
+      ["enquiry-message", "Maya would benefit from essay planning support."],
+    ] as const) {
+      if (await page.locator(`#${fieldId}`).inputValue() !== expectedValue) {
+        throw new BrowserSmokeCheckError(
+          `The failed enquiry response cleared "${fieldId}" instead of preserving it.`,
+        );
+      }
+    }
+    await expectActive(page, "button-submit-enquiry");
+    await page.keyboard.press("Enter");
     await expectSuccessfulReceipt(page, timeoutMs);
+    if (Number(interceptedEnquiryRequests) !== 2) {
+      throw new BrowserSmokeCheckError(
+        "The keyboard retry did not submit the enquiry exactly once.",
+      );
+    }
 
     await runTutorProfileSmokeCheck(page, baseUrl, timeoutMs);
 
     console.log(`Enquiry keyboard smoke check passed for ${baseUrl.origin}`);
     console.log("  ✓ native Tab order and disabled-submit behavior");
     console.log("  ✓ Enter validation recovery");
+    console.log("  ✓ announced server-error recovery and keyboard retry");
     console.log("  ✓ standalone keyboard submission and announced success receipt");
     console.log("  ✓ preselected-tutor profile submission and announced success receipt");
   } finally {
