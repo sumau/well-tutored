@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { ensureSeedContent } from "./lib/seed-content";
 
 const rawPort = process.env["PORT"];
 
@@ -13,6 +14,15 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+try {
+  if (process.env.NODE_ENV === "development") {
+    await ensureSeedContent();
+  }
+} catch (err) {
+  logger.error({ err }, "Failed to prepare illustrative content");
+  process.exit(1);
 }
 
 app.listen(port, (err) => {

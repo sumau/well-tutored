@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Well Tutored"
+description = "A tutoring platform for discovering women tutors, reading tutor-written resources, and managing tutor profiles and articles through a private workspace."
+version = "1.0.0"
+id = "artifacts/well-tutored"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22104
+
+[services.development]
+run = "pnpm --filter @workspace/well-tutored run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/well-tutored", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/well-tutored/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22104"
+BASE_PATH = "/"

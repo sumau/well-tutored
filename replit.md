@@ -1,15 +1,15 @@
-# [Project name]
+# Well Tutored
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Well Tutored helps families discover women tutors, read tutor-written resources, and send named-tutor enquiries.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL`, Clerk-managed auth variables, and `SESSION_SECRET`
 
 ## Stack
 
@@ -22,23 +22,33 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/well-tutored/src` — public directory, tutor/resource pages, enquiry flow, auth screens, and private workspace
+- `artifacts/api-server/src` — Express routes, Clerk middleware, seed/bootstrap behavior, and server startup
+- `lib/db/src/schema` — Drizzle/PostgreSQL schema
+- `lib/api-spec/openapi.yaml` — API contract source of truth
+- `lib/api-client-react` and `lib/api-zod` — generated frontend hooks and runtime schemas
+- `artifacts/well-tutored/src/index.css` — editorial visual system and theme tokens
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The public site remains accessible without an account; Clerk gates only the private workspace.
+- Browser API requests use Clerk's same-origin session cookies; bearer-token wiring is reserved for mobile clients.
+- Public tutor/resource content is served through the API and seeded for a useful first preview.
+- OpenAPI generates both React Query hooks and Zod schemas to keep client/server contracts aligned.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The public experience presents women tutors educated at Russell Group universities, their expertise and availability, and a library of tutor-written learning resources. Visitors can open a tutor profile and submit a named-tutor enquiry. Approved workspace users can manage tutor profiles, resources, and workspace accounts.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Well Tutored A is the source of truth for this standalone app; no comparison with Well Tutored B is needed.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run `pnpm --filter @workspace/api-spec run codegen` after changing `lib/api-spec/openapi.yaml`.
+- The managed workflows provide artifact `PORT` and `BASE_PATH`; the Vite configs also include local-build defaults.
+- Development Clerk keys are expected in preview; the production app receives its own managed environment.
 
 ## Pointers
 

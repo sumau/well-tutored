@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: tutors
+    description: Public tutor profiles
+  - name: resources
+    description: Tutor-written resources
+  - name: enquiries
+    description: Named-tutor enquiries
+  - name: workspace
+    description: Authenticated tutor publishing workspace
 paths:
   /healthz:
     get:
@@ -24,7 +32,460 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /tutors:
+    get:
+      operationId: listTutors
+      tags: [tutors]
+      summary: List available tutors
+      responses:
+        "200":
+          description: Tutor profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tutor"
+  /tutors/{slug}:
+    get:
+      operationId: getTutor
+      tags: [tutors]
+      summary: Get a tutor profile
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Tutor profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tutor"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /resources:
+    get:
+      operationId: listResources
+      tags: [resources]
+      summary: List tutor-written resources
+      parameters:
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: query
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resource summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Resource"
+  /resources/{slug}:
+    get:
+      operationId: getResource
+      tags: [resources]
+      summary: Get a full tutor-written resource
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /enquiries:
+    post:
+      operationId: createEnquiry
+      tags: [enquiries]
+      summary: Submit a named-tutor enquiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnquiryInput"
+      responses:
+        "201":
+          description: Enquiry received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnquiryReceipt"
+        "400":
+          description: Invalid enquiry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /workspace/me:
+    get:
+      operationId: getWorkspaceSession
+      tags: [workspace]
+      summary: Get or provision the authenticated workspace account
+      responses:
+        "200":
+          description: Workspace session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /workspace/articles:
+    get:
+      operationId: listWorkspaceArticles
+      tags: [workspace]
+      summary: List articles editable by the current account
+      responses:
+        "200":
+          description: Editable articles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceArticle"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createWorkspaceArticle
+      tags: [workspace]
+      summary: Create a tutor article draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceArticleInput"
+      responses:
+        "201":
+          description: Article draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceArticle"
+        "400":
+          description: Invalid article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /workspace/articles/{id}:
+    patch:
+      operationId: updateWorkspaceArticle
+      tags: [workspace]
+      summary: Update an owned article
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceArticleUpdate"
+      responses:
+        "200":
+          description: Article updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceArticle"
+        "400":
+          description: Invalid article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteWorkspaceArticle
+      tags: [workspace]
+      summary: Delete an owned article
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Article deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /workspace/profile:
+    patch:
+      operationId: updateWorkspaceProfile
+      tags: [workspace]
+      summary: Update the current tutor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorProfileUpdate"
+      responses:
+        "200":
+          description: Tutor profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTutor"
+        "400":
+          description: Invalid profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /workspace/profile/draft:
+    delete:
+      operationId: discardWorkspaceProfileDraft
+      tags: [workspace]
+      summary: Discard the current tutor profile draft
+      responses:
+        "200":
+          description: Draft discarded and published profile returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTutor"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: No published profile exists to restore
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /workspace/tutors:
+    get:
+      operationId: listWorkspaceTutors
+      tags: [workspace]
+      summary: List tutor profiles for owner management
+      responses:
+        "200":
+          description: Tutor profiles, including drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceTutor"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createWorkspaceTutor
+      tags: [workspace]
+      summary: Create a tutor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorStubInput"
+      responses:
+        "201":
+          description: Tutor profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTutor"
+        "400":
+          description: Invalid tutor profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /workspace/tutors/{id}:
+    post:
+      operationId: archiveWorkspaceTutor
+      tags: [workspace]
+      summary: Archive a tutor profile
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Tutor profile archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTutor"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: restoreWorkspaceTutor
+      tags: [workspace]
+      summary: Restore an archived tutor profile
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Tutor profile restored as a draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTutor"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteWorkspaceTutor
+      tags: [workspace]
+      summary: Permanently delete a tutor profile (exceptional)
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Tutor profile deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /workspace/accounts:
+    get:
+      operationId: listWorkspaceAccounts
+      tags: [workspace]
+      summary: List tutor workspace accounts for owner management
+      responses:
+        "200":
+          description: Workspace accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /workspace/accounts/{id}:
+    delete:
+      operationId: deleteWorkspaceAccount
+      tags: [workspace]
+      summary: Delete a workspace account
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Workspace account deleted
+        "400":
+          description: The owner account cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateWorkspaceAccount
+      tags: [workspace]
+      summary: Approve, assign, or revoke a workspace account
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceAccountUpdate"
+      responses:
+        "200":
+          description: Workspace account updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceAccount"
+        "400":
+          description: Invalid account assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +494,258 @@ components:
           type: string
       required:
         - status
+    Tutor:
+      type: object
+      required: [id, slug, name, firstName, lastName, initials, subject, support, profileSummary, university, qualification, bio, style, teachingIntro, teachingPoints, rate, availability, tint, resources]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        initials: { type: string }
+        subject: { type: string }
+        support: { type: string }
+        profileSummary: { type: string, maxLength: 200 }
+        university: { type: string }
+        qualification: { type: string }
+        bio: { type: string }
+        style: { type: string }
+        teachingIntro: { type: string }
+        teachingPoints:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/TeachingPoint"
+        rate: { type: number }
+        availability: { type: string, enum: [accepting, limited, unavailable] }
+        tint: { type: string }
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Resource"
+    WorkspaceTutor:
+      type: object
+      required: [id, slug, name, firstName, lastName, initials, subject, support, profileSummary, university, qualification, bio, style, teachingIntro, teachingPoints, profileStatus, rate, availability, tint, resources]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        initials: { type: string }
+        subject: { type: string }
+        support: { type: string }
+        profileSummary: { type: string, maxLength: 200 }
+        university: { type: string }
+        qualification: { type: string }
+        bio: { type: string }
+        style: { type: string }
+        teachingIntro: { type: string }
+        teachingPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceTeachingPoint"
+        profileStatus: { type: string, enum: [draft, published, archived] }
+        rate: { type: number }
+        availability: { type: string, enum: [accepting, limited, unavailable] }
+        tint: { type: string }
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Resource"
+    Resource:
+      type: object
+      required: [id, slug, title, tutorSlug, tutorName, tutorTint, subject, level, type, readMinutes, excerpt, publishedAt, tint]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        tutorSlug: { type: string }
+        tutorName: { type: string }
+        tutorTint: { type: string }
+        subject: { type: string }
+        level: { type: string }
+        type: { $ref: "#/components/schemas/ResourceType" }
+        readMinutes: { type: integer }
+        excerpt: { type: string }
+        publishedAt: { type: string, format: date }
+        tint: { type: string }
+    ResourceDetail:
+      allOf:
+        - $ref: "#/components/schemas/Resource"
+        - type: object
+          required: [body, sections, related]
+          properties:
+            body: { type: string }
+            sections:
+              type: array
+              items:
+                $ref: "#/components/schemas/ResourceSection"
+            related:
+              type: array
+              items:
+                $ref: "#/components/schemas/Resource"
+    ResourceType:
+      type: string
+      enum: [Study note, Guide, Essay, Revision notes]
+    WorkspaceSession:
+      type: object
+      required: [id, role, email, displayName, availableTutorAccents]
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [owner, tutor, pending] }
+        email: { type: string }
+        displayName: { type: string }
+        availableTutorAccents:
+          type: array
+          items:
+            type: string
+            enum: ["#D98F7F", "#D8B267", "#B5A1CC", "#83B7B0", "#9DBB83", "#8EA8CE", "#C98B9B", "#A88DBD", "#7FA6A0", "#8B9FC2", "#D08C76", "#C2A06E", "#B48C9E", "#8C8FB5", "#73A9A1", "#8FAE7E", "#A997C7", "#7899B5", "#C18A9A", "#9C9A72"]
+        tutor:
+          oneOf:
+            - $ref: "#/components/schemas/WorkspaceTutor"
+            - type: "null"
+    WorkspaceAccount:
+      type: object
+      required: [id, role, email, displayName, tutorProfileStatus]
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [owner, tutor, pending] }
+        email: { type: string }
+        displayName: { type: string }
+        tutorId: { type: ["integer", "null"] }
+        tutorName: { type: ["string", "null"] }
+        tutorProfileStatus: { type: ["string", "null"] }
+    WorkspaceAccountUpdate:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [owner, tutor, pending] }
+        tutorId: { type: ["integer", "null"] }
+    WorkspaceArticle:
+      type: object
+      required: [id, slug, tutorId, tutorName, title, subject, level, type, readMinutes, excerpt, body, sections, publishedAt, tint, status]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        tutorId: { type: integer }
+        tutorName: { type: string }
+        title: { type: string }
+        subject: { type: string }
+        level: { type: string }
+        type: { $ref: "#/components/schemas/ResourceType" }
+        readMinutes: { type: integer }
+        excerpt: { type: string }
+        body: { type: string }
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceSection"
+        publishedAt: { type: string, format: date }
+        tint: { type: string }
+        status: { type: string, enum: [draft, published] }
+    WorkspaceArticleInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 3 }
+        subject: { type: string }
+        level: { type: string }
+        type:
+          $ref: "#/components/schemas/ResourceType"
+        excerpt: { type: string }
+        body: { type: string }
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceSection"
+    WorkspaceArticleUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 3 }
+        subject: { type: string }
+        level: { type: string }
+        type:
+          $ref: "#/components/schemas/ResourceType"
+        excerpt: { type: string }
+        body: { type: string }
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceSection"
+        status: { type: string, enum: [draft, published] }
+    TutorProfileUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        initials: { type: string, maxLength: 4 }
+        subject: { type: string }
+        support: { type: string }
+        profileSummary: { type: string, maxLength: 200 }
+        university: { type: string }
+        qualification: { type: string }
+        bio: { type: string }
+        style: { type: string }
+        teachingIntro: { type: string, maxLength: 200 }
+        teachingPoints:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/WorkspaceTeachingPoint"
+        rate: { type: number, minimum: 0 }
+        availability: { type: string, enum: [accepting, limited, unavailable] }
+        tint:
+          type: string
+          enum: ["#D98F7F", "#D8B267", "#B5A1CC", "#83B7B0", "#9DBB83", "#8EA8CE", "#C98B9B", "#A88DBD", "#7FA6A0", "#8B9FC2", "#D08C76", "#C2A06E", "#B48C9E", "#8C8FB5", "#73A9A1", "#8FAE7E", "#A997C7", "#7899B5", "#C18A9A", "#9C9A72"]
+        status: { type: string, enum: [draft, published] }
+    TutorStubInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 2 }
+    ResourceSection:
+      type: object
+      required: [id, heading, body]
+      properties:
+        id: { type: string }
+        heading: { type: string }
+        body: { type: string }
+    TeachingPoint:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, minLength: 2 }
+        body: { type: string, minLength: 10 }
+    WorkspaceTeachingPoint:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string }
+        body: { type: string }
+    EnquiryInput:
+      type: object
+      required: [name, email, tutorSlug, studentName, studentAge, subjectLevel, message]
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, minLength: 3 }
+        tutorSlug: { type: string, minLength: 1 }
+        studentName: { type: string, minLength: 1 }
+        studentAge: { type: string, minLength: 1 }
+        subjectLevel: { type: string, minLength: 1 }
+        message: { type: string, minLength: 10 }
+    EnquiryReceipt:
+      type: object
+      required: [id, tutorName, receivedAt]
+      properties:
+        id: { type: integer }
+        tutorName: { type: string }
+        receivedAt: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
 
