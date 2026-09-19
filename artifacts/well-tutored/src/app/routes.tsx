@@ -17,6 +17,11 @@ import WorkspaceAccounts from "@/pages/workspace/accounts";
 import WorkspaceTutorProfiles from "@/pages/workspace/tutor-profiles";
 import WorkspaceResourceEditor from "@/pages/workspace/resource-editor";
 import WorkspaceProfile from "@/pages/workspace/profile";
+import {
+  legacyWorkspaceResourcePath,
+  routePaths,
+  workspaceSignedOutRedirect,
+} from "./route-map";
 
 function RouteMeta() {
   const [location] = useLocation();
@@ -70,9 +75,7 @@ function RouteMeta() {
 function LegacyWorkspaceResourceRedirect() {
   const params = useParams<{ id?: string }>();
   return (
-    <Redirect
-      to={params.id ? `/workspace/resources/${params.id}` : "/workspace/resources/new"}
-    />
+    <Redirect to={legacyWorkspaceResourcePath(params.id)} />
   );
 }
 
@@ -83,21 +86,21 @@ function WorkspaceRoutes() {
         <WorkspaceLayout>
           <WorkspaceAuthBoundary>
             <Switch>
-              <Route path="/workspace" component={WorkspaceDashboard} />
-              <Route path="/workspace/accounts" component={WorkspaceAccounts} />
-              <Route path="/workspace/tutors" component={WorkspaceTutorProfiles} />
-              <Route path="/workspace/profile" component={WorkspaceProfile} />
-              <Route path="/workspace/resources/new" component={WorkspaceResourceEditor} />
-              <Route path="/workspace/resources/:id" component={WorkspaceResourceEditor} />
-              <Route path="/workspace/articles/new" component={LegacyWorkspaceResourceRedirect} />
-              <Route path="/workspace/articles/:id" component={LegacyWorkspaceResourceRedirect} />
+              <Route path={routePaths.workspace.root} component={WorkspaceDashboard} />
+              <Route path={routePaths.workspace.accounts} component={WorkspaceAccounts} />
+              <Route path={routePaths.workspace.tutors} component={WorkspaceTutorProfiles} />
+              <Route path={routePaths.workspace.profile} component={WorkspaceProfile} />
+              <Route path={routePaths.workspace.resourceNew} component={WorkspaceResourceEditor} />
+              <Route path={routePaths.workspace.resource} component={WorkspaceResourceEditor} />
+              <Route path={routePaths.workspace.legacyResourceNew} component={LegacyWorkspaceResourceRedirect} />
+              <Route path={routePaths.workspace.legacyResource} component={LegacyWorkspaceResourceRedirect} />
               <Route component={NotFound} />
             </Switch>
           </WorkspaceAuthBoundary>
         </WorkspaceLayout>
       </Show>
       <Show when="signed-out">
-        <Redirect to="/sign-in" />
+        <Redirect to={workspaceSignedOutRedirect()} />
       </Show>
     </>
   );
@@ -108,17 +111,17 @@ export function AppRoutes() {
     <>
       <RouteMeta />
       <Switch>
-        <Route path="/workspace/*?" component={WorkspaceRoutes} />
+        <Route path={routePaths.workspace.wildcard} component={WorkspaceRoutes} />
         <Route>
           <Shell>
             <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/tutors/:slug" component={TutorProfile} />
-              <Route path="/resources" component={Resources} />
-              <Route path="/resources/:slug" component={ResourceDetail} />
-              <Route path="/enquire" component={Enquiry} />
-              <Route path="/sign-in/*?" component={SignInPage} />
-              <Route path="/sign-up/*?" component={SignUpPage} />
+              <Route path={routePaths.public.home} component={Home} />
+              <Route path={routePaths.public.tutorProfile} component={TutorProfile} />
+              <Route path={routePaths.public.resources} component={Resources} />
+              <Route path={routePaths.public.resourceDetail} component={ResourceDetail} />
+              <Route path={routePaths.public.enquiry} component={Enquiry} />
+              <Route path={routePaths.auth.signIn} component={SignInPage} />
+              <Route path={routePaths.auth.signUp} component={SignUpPage} />
               <Route component={NotFound} />
             </Switch>
           </Shell>
