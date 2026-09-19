@@ -84,7 +84,7 @@ export type RouteMetadata = {
 const defaultRouteMetadata: RouteMetadata = {
   title: "Well Tutored | Women tutors for secondary and A-level students",
   description:
-    "Browse women tutors educated at Russell Group universities, read their subject resources and submit a named-tutor enquiry.",
+    "Browse women tutors, read their subject resources and submit a named-tutor enquiry.",
 };
 
 function humanizeSlug(value: string) {

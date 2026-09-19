@@ -74,7 +74,7 @@ export function Shell({ children }: { children: ReactNode }) {
               well tutored
             </Link>
             <p className="text-[#C9BFB4] leading-[1.65] max-w-[300px]">
-              Women tutors educated at Russell Group universities, supporting female secondary and A-level students.
+              Women tutors supporting female secondary and A-level students.
             </p>
           </div>
           

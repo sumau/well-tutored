@@ -40,7 +40,7 @@ export default function Home() {
             Academic excellence,<br /><em>personalised for her.</em>
           </h1>
           <p className="max-w-[610px] text-muted-foreground text-[16px] leading-[1.65] mb-[30px]" data-testid="hero-copy">
-            Well Tutored offers thoughtful, one-to-one support for female secondary and A-level students, led by women tutors educated at Russell Group universities.
+            Well Tutored offers thoughtful, one-to-one support for female secondary and A-level students, led by women tutors with deep subject expertise.
           </p>
           <button 
             className="bg-foreground text-background inline-flex items-center gap-2.5 px-[18px] py-[14px] text-[12px] font-bold hover:bg-primary transition-colors"
@@ -52,7 +52,7 @@ export default function Home() {
         </div>
         <aside className="border-l border-border pl-[26px] pb-1 text-muted-foreground text-[13px] leading-[1.6]">
           <strong className="block text-foreground font-serif text-[24px] font-normal mb-[9px]">
-            Women tutors.<br />Russell Group educated.
+            Women tutors.<br />Thoughtful, expert support.
           </strong>
           Support for the subject in front of you, and the person doing the learning.
         </aside>
