@@ -122,6 +122,14 @@ export interface WorkspaceTutor {
   resources: Resource[];
 }
 
+export interface ResourcePage {
+  items: Resource[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface ResourceSection {
   id: string;
   heading: string;
@@ -133,6 +141,11 @@ export type ResourceDetail = Resource & {
   sections: ResourceSection[];
   related: Resource[];
 };
+
+export interface SavedResourceState {
+  resourceId: number;
+  saved: boolean;
+}
 
 export type WorkspaceSessionRole = typeof WorkspaceSessionRole[keyof typeof WorkspaceSessionRole];
 
@@ -415,5 +428,14 @@ export type ForbiddenResponse = Error;
 export type ListResourcesParams = {
 subject?: string;
 query?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 24
+ */
+pageSize?: number;
 };
 

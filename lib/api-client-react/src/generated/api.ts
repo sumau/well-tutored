@@ -34,6 +34,8 @@ import type {
   NotFoundResponse,
   Resource,
   ResourceDetail,
+  ResourcePage,
+  SavedResourceState,
   Tutor,
   TutorProfileUpdate,
   TutorStubInput,
@@ -397,9 +399,9 @@ export const getListResourcesUrl = (params?: ListResourcesParams,) => {
 /**
  * @summary List tutor-written resources
  */
-export const listResources = async (params?: ListResourcesParams, options?: Parameters<typeof customFetch>[1]): Promise<Resource[]> => {
+export const listResources = async (params?: ListResourcesParams, options?: Parameters<typeof customFetch>[1]): Promise<ResourcePage> => {
 
-  return customFetch<Resource[]>(getListResourcesUrl(params),
+  return customFetch<ResourcePage>(getListResourcesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -587,6 +589,255 @@ export function useGetResource<TData = Awaited<ReturnType<typeof getResource>>, 
 
 
 
+
+export const getListSavedResourcesUrl = () => {
+
+
+
+
+  return `/api/workspace/saved-resources`
+}
+
+/**
+ * @summary List resources saved by the current account
+ */
+export const listSavedResources = async ( options?: Parameters<typeof customFetch>[1]): Promise<Resource[]> => {
+
+  return customFetch<Resource[]>(getListSavedResourcesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSavedResourcesQueryKey = () => {
+    return [
+    `/api/workspace/saved-resources`
+    ] as const;
+    }
+
+
+export const getListSavedResourcesQueryOptions = <TData = Awaited<ReturnType<typeof listSavedResources>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSavedResourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSavedResources>>> = ({ signal }) => listSavedResources({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSavedResourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listSavedResources>>>
+export type ListSavedResourcesQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListSavedResources<TData = Awaited<ReturnType<typeof listSavedResources>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSavedResources>>,
+          TError,
+          Awaited<ReturnType<typeof listSavedResources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSavedResources<TData = Awaited<ReturnType<typeof listSavedResources>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSavedResources>>,
+          TError,
+          Awaited<ReturnType<typeof listSavedResources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSavedResources<TData = Awaited<ReturnType<typeof listSavedResources>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List resources saved by the current account
+ */
+
+export function useListSavedResources<TData = Awaited<ReturnType<typeof listSavedResources>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSavedResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSavedResourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveResourceUrl = (id: number,) => {
+
+
+
+
+  return `/api/workspace/saved-resources/${id}`
+}
+
+/**
+ * @summary Save a published resource for the current account
+ */
+export const saveResource = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<SavedResourceState> => {
+
+  return customFetch<SavedResourceState>(getSaveResourceUrl(id),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+
+export const getSaveResourceMutationKey = () => ['saveResource'] as const;
+
+export const getSaveResourceMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveResource>>, TError,SaveResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveResource>>, TError,SaveResourceMutationVariables, TContext> => {
+
+const mutationKey = getSaveResourceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveResource>>, SaveResourceMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  saveResource(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveResourceMutationResult = NonNullable<Awaited<ReturnType<typeof saveResource>>>
+
+    export type SaveResourceMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type SaveResourceMutationVariables = {id: number}
+
+    /**
+ * @summary Save a published resource for the current account
+ */
+export const useSaveResource = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveResource>>, TError,SaveResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveResource>>,
+        TError,
+        SaveResourceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveResourceMutationOptions(options), queryClient);
+    }
+
+export const getUnsaveResourceUrl = (id: number,) => {
+
+
+
+
+  return `/api/workspace/saved-resources/${id}`
+}
+
+/**
+ * @summary Remove a resource from the current account's saved list
+ */
+export const unsaveResource = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getUnsaveResourceUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnsaveResourceMutationKey = () => ['unsaveResource'] as const;
+
+export const getUnsaveResourceMutationOptions = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsaveResource>>, TError,UnsaveResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unsaveResource>>, TError,UnsaveResourceMutationVariables, TContext> => {
+
+const mutationKey = getUnsaveResourceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unsaveResource>>, UnsaveResourceMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  unsaveResource(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnsaveResourceMutationResult = NonNullable<Awaited<ReturnType<typeof unsaveResource>>>
+
+    export type UnsaveResourceMutationError = ErrorType<UnauthorizedResponse>
+    export type UnsaveResourceMutationVariables = {id: number}
+
+    /**
+ * @summary Remove a resource from the current account's saved list
+ */
+export const useUnsaveResource = <TError = ErrorType<UnauthorizedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsaveResource>>, TError,UnsaveResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof unsaveResource>>,
+        TError,
+        UnsaveResourceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnsaveResourceMutationOptions(options), queryClient);
+    }
 
 export const getCreateEnquiryUrl = () => {
 

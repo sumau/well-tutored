@@ -132,12 +132,22 @@ export const GetTutorResponse = zod.object({
 /**
  * @summary List tutor-written resources
  */
+export const listResourcesQueryPageDefault = 1;
+
+export const listResourcesQueryPageSizeDefault = 9;
+export const listResourcesQueryPageSizeMax = 24;
+
+
+
 export const ListResourcesQueryParams = zod.object({
   "subject": zod.coerce.string().optional(),
-  "query": zod.coerce.string().optional()
+  "query": zod.coerce.string().optional(),
+  "page": zod.coerce.number().int().min(1).default(listResourcesQueryPageDefault),
+  "pageSize": zod.coerce.number().int().min(1).max(listResourcesQueryPageSizeMax).default(listResourcesQueryPageSizeDefault)
 })
 
-export const ListResourcesResponseItem = zod.object({
+export const ListResourcesResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.int(),
   "slug": zod.string(),
   "title": zod.string(),
@@ -151,8 +161,12 @@ export const ListResourcesResponseItem = zod.object({
   "excerpt": zod.string(),
   "publishedAt": zod.coerce.date(),
   "tint": zod.string()
+})),
+  "page": zod.int(),
+  "pageSize": zod.int(),
+  "total": zod.int(),
+  "hasMore": zod.boolean()
 })
-export const ListResourcesResponse = zod.array(ListResourcesResponseItem)
 
 
 /**
@@ -202,6 +216,56 @@ export const GetResourceResponse = zod.object({
   "tint": zod.string()
 }))
 }))
+
+
+/**
+ * @summary List resources saved by the current account
+ */
+export const ListSavedResourcesResponseItem = zod.object({
+  "id": zod.int(),
+  "slug": zod.string(),
+  "title": zod.string(),
+  "tutorSlug": zod.string(),
+  "tutorName": zod.string(),
+  "tutorTint": zod.string(),
+  "subject": zod.string(),
+  "level": zod.string(),
+  "type": zod.enum(['Study note', 'Guide', 'Essay', 'Revision notes']),
+  "readMinutes": zod.int(),
+  "excerpt": zod.string(),
+  "publishedAt": zod.coerce.date(),
+  "tint": zod.string()
+})
+export const ListSavedResourcesResponse = zod.array(ListSavedResourcesResponseItem)
+
+
+/**
+ * @summary Save a published resource for the current account
+ */
+
+
+
+export const SaveResourceParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const SaveResourceResponse = zod.object({
+  "resourceId": zod.int(),
+  "saved": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a resource from the current account's saved list
+ */
+
+
+
+export const UnsaveResourceParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const UnsaveResourceResponse = zod.void()
 
 
 /**

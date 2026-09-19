@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
-import { useListResources } from "@workspace/api-client-react";
-import { ArrowRight, Search } from "lucide-react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import {
+  useListResources,
+  useListSavedResources,
+} from "@workspace/api-client-react";
+import { useAuth } from "@clerk/react";
+import { Search } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
@@ -17,34 +20,63 @@ const FILTERS = [
 ];
 
 export default function Resources() {
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const [filter, setFilter] = useState("All resources");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { data: resources, isLoading, error, refetch } = useListResources();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
-  const visible = useMemo(() => {
-    if (!resources) return [];
+  const showingSaved = filter === "Saved";
+  const subject =
+    filter === "All resources" || showingSaved ? undefined : filter;
+  const { data, isLoading, isFetching, error, refetch } = useListResources({
+    subject,
+    query: debouncedQuery || undefined,
+    page,
+    pageSize: 9,
+  }, {
+    query: { enabled: !showingSaved },
+  });
+  const {
+    data: savedResources,
+    isLoading: savedIsLoading,
+    isFetching: savedIsFetching,
+    error: savedError,
+    refetch: refetchSaved,
+  } = useListSavedResources({
+    query: { enabled: Boolean(isAuthLoaded && isSignedIn && showingSaved) },
+  });
+  const visible = showingSaved
+    ? (savedResources ?? []).filter((resource) =>
+        `${resource.title} ${resource.tutorName} ${resource.subject} ${resource.excerpt}`
+          .toLowerCase()
+          .includes(debouncedQuery.toLowerCase()),
+      )
+    : data?.items ?? [];
+  const loading = showingSaved ? savedIsLoading : isLoading;
+  const fetching = showingSaved ? savedIsFetching : isFetching;
+  const loadError = showingSaved ? savedError : error;
+  const retry = showingSaved ? refetchSaved : refetch;
 
-    return resources.filter((resource) => {
-      const matchesFilter =
-        filter === "All resources" ||
-        resource.subject === filter ||
-        (filter === "Science" &&
-          ["Biology", "Physics", "Chemistry"].includes(resource.subject));
-      const matchesQuery = `${resource.title} ${resource.tutorName} ${resource.subject} ${resource.excerpt}`
-        .toLowerCase()
-        .includes(query.toLowerCase());
+  const selectFilter = (nextFilter: string) => {
+    setFilter(nextFilter);
+    setPage(1);
+  };
 
-      return matchesFilter && matchesQuery;
-    });
-  }, [resources, filter, query]);
-
-  if (isLoading) return <LoadingState message="Loading resources..." />;
-  if (error) {
+  if (loading) return <LoadingState message="Loading resources..." />;
+  if (loadError) {
     return (
       <ErrorState
         message="Could not load the resources."
-        onRetry={refetch}
+        onRetry={retry}
       />
     );
   }
@@ -96,7 +128,7 @@ export default function Resources() {
             role="group"
             aria-label="Filter by resource type"
           >
-            {FILTERS.map((item) => (
+            {[...FILTERS, ...(isSignedIn ? ["Saved"] : [])].map((item) => (
               <button
                 key={item}
                 className={`border px-[12px] py-[9px] text-[11px] transition-colors font-medium ${
@@ -105,7 +137,7 @@ export default function Resources() {
                     : "border-border text-muted-foreground hover:border-foreground hover:text-foreground hover:bg-card"
                 }`}
                 aria-pressed={filter === item}
-                onClick={() => setFilter(item)}
+                onClick={() => selectFilter(item)}
                 data-testid={`filter-${item}`}
               >
                 {item}
@@ -132,19 +164,56 @@ export default function Resources() {
       >
         <div className="max-w-[1150px] mx-auto">
           {visible.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[15px] md:gap-[25px]">
-              {visible.map((resource, index) => (
-                <ResourceCard
-                  key={resource.id}
-                  resource={resource}
-                  index={index}
-                />
-              ))}
-            </div>
+            <>
+              <div
+                className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[15px] md:gap-[25px] transition-opacity ${
+                  fetching ? "opacity-55" : "opacity-100"
+                }`}
+              >
+                {visible.map((resource, index) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    index={index}
+                  />
+                ))}
+              </div>
+              {!showingSaved && (page > 1 || data?.hasMore) && (
+                <nav
+                  className="mt-10 flex items-center justify-between border-t border-border pt-6"
+                  aria-label="Resource pages"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page === 1 || fetching}
+                    className="border border-border px-4 py-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 hover:border-foreground"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[12px] text-muted-foreground">
+                    Page {page}
+                    {data?.total ? ` · ${data.total} resources` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => current + 1)}
+                    disabled={!data?.hasMore || fetching}
+                    className="border border-border px-4 py-2.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40 hover:border-foreground"
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
+            </>
           ) : (
             <EmptyState
               title="No resources found"
-              message="Try adjusting your filter or search term to see more resources."
+              message={
+                showingSaved
+                  ? "Resources you save for later will appear here."
+                  : "Try adjusting your filter or search term to see more resources."
+              }
             />
           )}
         </div>

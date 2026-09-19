@@ -1,5 +1,14 @@
 import { useParams, Link } from "wouter";
-import { useGetResource, getGetResourceQueryKey, useListResources, getListResourcesQueryKey } from "@workspace/api-client-react";
+import {
+  getGetResourceQueryKey,
+  getListSavedResourcesQueryKey,
+  useGetResource,
+  useListSavedResources,
+  useSaveResource,
+  useUnsaveResource,
+} from "@workspace/api-client-react";
+import { useAuth } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Bookmark, Clock3, List, Printer, Share2 } from "lucide-react";
 import { useState } from "react";
 import { ErrorState } from "@/components/ErrorState";
@@ -11,36 +20,100 @@ import { ResourceTypeLabel } from "@/components/ResourceType";
 export default function ResourceDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
-  const [saved, setSaved] = useState(false);
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   
   const { data: resource, isLoading, error, refetch } = useGetResource(slug as string, {
     query: { enabled: !!slug, queryKey: getGetResourceQueryKey(slug as string) }
   });
 
-  const { data: allResources } = useListResources({ subject: resource?.subject }, {
-    query: { enabled: !!resource, queryKey: getListResourcesQueryKey({ subject: resource?.subject }) }
+  const { data: savedResources } = useListSavedResources({
+    query: { enabled: Boolean(isAuthLoaded && isSignedIn) }
   });
 
-  const related = allResources?.filter(r => r.slug !== slug).slice(0, 3) || [];
+  const saved = Boolean(
+    resource && savedResources?.some((item) => item.id === resource.id),
+  );
+  const related = resource?.related ?? [];
+  const saveResource = useSaveResource({
+    mutation: {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: getListSavedResourcesQueryKey(),
+        });
+        toast({
+          title: "Saved for later",
+          description: "This resource is now in your saved list.",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Could not save resource",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+  const unsaveResource = useUnsaveResource({
+    mutation: {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: getListSavedResourcesQueryKey(),
+        });
+        toast({
+          title: "Removed from saved",
+          description: "This resource is no longer in your saved list.",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Could not update saved resources",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
 
   const handleShare = async () => {
     try {
+      if (navigator.share) {
+        await navigator.share({
+          title: resource?.title,
+          url: window.location.href,
+        });
+        return;
+      }
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(window.location.href);
       toast({
         title: "Link copied",
         description: "Resource link copied to clipboard.",
       });
-    } catch (e) {
-      // Fallback
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast({
+        title: "Could not share this resource",
+        description: "Copy the page address from your browser and try again.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleSave = () => {
-    setSaved(!saved);
-    toast({
-      title: saved ? "Removed from saved" : "Saved to notes",
-      description: saved ? "Resource removed from your saved list." : "Resource saved for later reading.",
-    });
+    if (!resource) return;
+    if (!isSignedIn) {
+      setShowSignInPrompt(true);
+      return;
+    }
+    setShowSignInPrompt(false);
+    if (saved) {
+      unsaveResource.mutate({ id: resource.id });
+    } else {
+      saveResource.mutate({ id: resource.id });
+    }
   };
 
   const jumpTo = (id: string) => {
@@ -91,9 +164,15 @@ export default function ResourceDetail() {
             <div className="flex gap-[9px] items-center flex-wrap my-[25px]">
               <button 
                 onClick={handleSave}
+                disabled={
+                  !isAuthLoaded ||
+                  saveResource.isPending ||
+                  unsaveResource.isPending
+                }
+                aria-pressed={isSignedIn ? saved : undefined}
                 className={`border px-[13px] py-[11px] inline-flex items-center gap-[8px] text-[12px] font-medium transition-colors ${
                   saved ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground hover:bg-foreground hover:text-background"
-                }`}
+                } disabled:cursor-wait disabled:opacity-60`}
               >
                 <Bookmark size={14} className={saved ? "fill-current" : ""} /> {saved ? "Saved" : "Save"}
               </button>
@@ -104,6 +183,17 @@ export default function ResourceDetail() {
                 <Share2 size={14} /> Share
               </button>
             </div>
+            {showSignInPrompt && !isSignedIn && (
+              <p className="mb-[20px] text-[11px] leading-[1.6]" role="status">
+                <Link
+                  href={`/sign-in?next=${encodeURIComponent(`/resources/${resource.slug}`)}`}
+                  className="font-bold text-primary underline underline-offset-4"
+                >
+                  Sign in
+                </Link>{" "}
+                to save this resource across devices.
+              </p>
+            )}
             
             <div className="flex items-center gap-[9px] pt-[18px] border-t border-border text-[11px] flex-wrap">
               <button onClick={() => window.print()} className="inline-flex items-center gap-[6px] hover:text-primary transition-colors">

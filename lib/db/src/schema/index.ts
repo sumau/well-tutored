@@ -22,3 +22,4 @@ export * from "./tutor-profile-drafts";
 export * from "./resources";
 export * from "./enquiries";
 export * from "./workspace-accounts";
+export * from "./saved-resources";

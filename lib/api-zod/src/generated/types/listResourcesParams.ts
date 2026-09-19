@@ -9,4 +9,13 @@
 export type ListResourcesParams = {
 subject?: string;
 query?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 24
+ */
+pageSize?: number;
 };
