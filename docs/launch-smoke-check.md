@@ -16,14 +16,18 @@ SMOKE_BASE_URL=https://example.replit.app pnpm smoke:launch
 ```
 
 The root package also registers a `postpublish` lifecycle hook. It runs the
-strict published-target variant automatically:
+strict published-target variant automatically. The lifecycle receives the URL
+reported by the current Publishing run through `REPLIT_PUBLISHED_URL` and
+passes it to the smoke command as `SMOKE_PUBLISHED_URL`:
 
 ```sh
-pnpm smoke:launch:published
+REPLIT_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:launch:published:lifecycle
 ```
 
-Before running the published-target variant, provide the URL reported by the
-current Publishing run:
+If the Publishing output is unavailable, the lifecycle fails before making
+requests with an actionable error. It never substitutes the checked-in
+`SMOKE_PRODUCTION_URL` value or `REPLIT_DOMAINS`, which can point to a
+development domain. For a direct manual run, provide the current URL explicitly:
 
 ```sh
 SMOKE_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:launch:published
@@ -33,8 +37,7 @@ Published mode compares `SMOKE_PUBLISHED_URL` with
 `SMOKE_PRODUCTION_URL` in the artifact deployment configuration before making
 requests. If they differ, update the artifact value after a domain change and
 rerun the check. Missing or mismatched metadata fails with an actionable
-message instead of silently checking an older deployment. The check does not
-read `REPLIT_DOMAINS`, which can point to a development domain.
+message instead of silently checking an older deployment.
 
 `SMOKE_BASE_URL` remains available as an explicit override for custom domains
 and local verification, including the published command:

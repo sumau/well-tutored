@@ -8,6 +8,7 @@ const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
 );
 const PRODUCTION_URL_CONFIG_KEY = "SMOKE_PRODUCTION_URL";
 const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
+const PUBLISHING_OUTPUT_URL_ENV_KEY = "REPLIT_PUBLISHED_URL";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const PUBLISHED_CHECK_FLAG = "--published";
 
@@ -148,11 +149,15 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
   }
 
   if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
-    const publishedUrl = process.env[PUBLISHED_URL_ENV_KEY]?.trim();
+    const publishedUrl =
+      process.env[PUBLISHED_URL_ENV_KEY]?.trim() ||
+      process.env[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim();
     if (!publishedUrl) {
       throw new SmokeCheckError(
         `Published launch check requires ${PUBLISHED_URL_ENV_KEY} from the current Publishing metadata. ` +
-          `Set it to the newly published URL, or set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
+          `The publish lifecycle must provide ${PUBLISHING_OUTPUT_URL_ENV_KEY}, ` +
+          `or set ${PUBLISHED_URL_ENV_KEY} manually. ` +
+          `Set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
       );
     }
 

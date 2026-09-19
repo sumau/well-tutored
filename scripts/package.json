@@ -7,9 +7,10 @@
     "hello": "tsx ./src/hello.ts",
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
+    "smoke:published:lifecycle": "tsx ./src/publish-smoke.ts",
     "smoke:enquiry": "tsx ./src/enquiry-browser-smoke.ts",
     "smoke:enquiry:published": "tsx ./src/enquiry-browser-smoke.ts --published",
-    "test:smoke": "tsx --test ./src/smoke-check.test.ts",
+    "test:smoke": "tsx --test ./src/smoke-check.test.ts ./src/publish-smoke.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
