@@ -189,6 +189,77 @@ test("invalid email and short message errors are announced and tied to their fie
   await cleanupForm(rendered);
 });
 
+test("a failed submission keeps an announced form error and a successful retry focuses the receipt", async () => {
+  const rendered = await renderForm();
+  const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+
+    if (requestCount === 1) {
+      return new Response(
+        JSON.stringify({ message: "The enquiry could not be recorded." }),
+        {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        id: 42,
+        tutorName: "Alice Smith",
+        receivedAt: "2026-09-19T12:00:00.000Z",
+        deliveryStatus: "delivered",
+        message: "Your enquiry has been sent securely.",
+      }),
+      {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await act(async () => {
+      fillCompleteForm(rendered.container);
+    });
+
+    await act(async () => {
+      submitForm(form);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const submitError = rendered.container.querySelector("[data-testid=error-enquiry-submit]")!;
+    assert.equal(submitError.getAttribute("role"), "alert");
+    assert.equal(
+      submitError.textContent,
+      "We could not record your enquiry. Please check the details and try again.",
+    );
+    assert.equal(form.contains(submitError), true);
+    assert.equal(rendered.container.querySelector("[data-testid=enquiry-success]"), null);
+
+    await act(async () => {
+      submitForm(form);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const receipt = rendered.container.querySelector("[data-testid=enquiry-success]")!;
+    assert.equal(requestCount, 2);
+    assert.equal(document.activeElement, receipt);
+    assert.equal(receipt.getAttribute("role"), "status");
+    assert.equal(receipt.getAttribute("aria-live"), "polite");
+    assert.match(receipt.textContent ?? "", /Message delivered/);
+    assert.match(receipt.textContent ?? "", /Your enquiry has been sent securely\./);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await cleanupForm(rendered);
+  }
+});
+
 test("a successful receipt receives focus and announces the delivery outcome", async () => {
   const rendered = await renderForm();
   const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
