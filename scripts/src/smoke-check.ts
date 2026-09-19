@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-
-export {};
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
   "../../artifacts/well-tutored/.replit-artifact/artifact.toml",
@@ -246,7 +246,7 @@ async function checkPublicPage(baseUrl: URL, path: string, timeoutMs: number) {
   }
 }
 
-async function runSmokeCheck() {
+export async function runSmokeCheck() {
   const baseUrl = resolveBaseUrl();
   const timeoutMs = resolveTimeoutMs();
   const passed: string[] = [];
@@ -412,10 +412,20 @@ async function runSmokeCheck() {
   }
 }
 
-try {
-  await runSmokeCheck();
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Launch smoke check failed: ${message}`);
-  process.exitCode = 1;
+export async function main(): Promise<number> {
+  try {
+    await runSmokeCheck();
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Launch smoke check failed: ${message}`);
+    return 1;
+  }
+}
+
+const invokedFile = process.argv[1] ? resolve(process.argv[1]) : undefined;
+const currentFile = resolve(fileURLToPath(import.meta.url));
+
+if (invokedFile === currentFile) {
+  process.exitCode = await main();
 }
