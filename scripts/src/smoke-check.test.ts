@@ -211,6 +211,14 @@ const failureCases: FailureCase[] = [
     }),
   },
   {
+    name: "responses that stall after sending headers",
+    expectedMessage: "/api/healthz: request failed: timed out after 2000ms",
+    respond: pathResponse("/api/healthz", (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.write('{"status":');
+    }),
+  },
+  {
     name: "connections that are dropped by the loopback service",
     expectedMessage: "/api/healthz: request failed:",
     respond: pathResponse("/api/healthz", (_request, response) => {
