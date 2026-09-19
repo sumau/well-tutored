@@ -1,8 +1,13 @@
 # Workspace owner bootstrap
 
-Workspace ownership is stored in the database. `WORKSPACE_ALLOWED_EMAILS` only
-controls which verified email addresses may create Workspace accounts; it does
-not grant the `owner` role.
+Workspace ownership is stored in the database. The API currently requires a
+verified primary Clerk email address, then creates a `pending` Workspace
+account for any verified email that does not already have an account.
+
+`WORKSPACE_ALLOWED_EMAILS` is documented here as a possible allowlist, but the
+current runtime does not read or enforce that variable. It must not be treated
+as an access-control mechanism unless the account-provisioning service is
+updated to enforce it.
 
 ## When this is needed
 
@@ -14,12 +19,10 @@ one-time provisioning step, not application startup behavior.
 
 1. Confirm that the target person has a Clerk account with a verified primary
    email address.
-2. Confirm that the target email is present in the development
-   `WORKSPACE_ALLOWED_EMAILS` secret.
-3. Have the target person sign in once so the API creates their pending
+2. Have the target person sign in once so the API creates their pending
    `workspace_accounts` record.
-4. Verify that the development database has zero rows with `role = 'owner'`.
-5. Run a guarded, development-only update for the exact target email:
+3. Verify that the development database has zero rows with `role = 'owner'`.
+4. Run a guarded, development-only update for the exact target email:
 
    ```sql
    UPDATE workspace_accounts
@@ -48,7 +51,7 @@ one-time provisioning step, not application startup behavior.
   handling.
 - Do not run the update if an owner already exists.
 - Do not change an existing owner through this bootstrap step.
-- Keep `WORKSPACE_ALLOWED_EMAILS` separate from owner role state.
+- Keep owner role state separate from any future email-allowlist policy.
 
 ## Database recovery
 
