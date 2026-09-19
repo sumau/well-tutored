@@ -162,6 +162,24 @@ const failureCases: FailureCase[] = [
     }),
   },
   {
+    name: "invalid JSON responses",
+    expectedMessage: "/api/healthz: response was not valid JSON.",
+    respond: pathResponse("/api/healthz", (_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end('{"status":');
+    }),
+  },
+  {
+    name: "responses that exceed the smoke timeout",
+    expectedMessage: "/api/healthz: request failed: timed out after 2000ms",
+    respond: pathResponse("/api/healthz", (_request, response) => {
+      setTimeout(() => {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ status: "ok" }));
+      }, 2_100);
+    }),
+  },
+  {
     name: "malformed Clerk payloads",
     expectedMessage:
       "/api/__clerk/v1/environment: unexpected auth_config object.",
