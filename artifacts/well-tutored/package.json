@@ -8,7 +8,7 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @workspace/api-server exec tsx --tsconfig ../well-tutored/tsconfig.json --test ../well-tutored/src/app/route-map.test.ts ../well-tutored/src/components/layout/WorkspaceAuthBoundary.test.tsx ../well-tutored/src/components/EnquiryForm.test.tsx"
+    "test": "pnpm --filter @workspace/api-server exec tsx --tsconfig ../well-tutored/tsconfig.json --test ../well-tutored/src/app/route-map.test.ts ../well-tutored/src/components/layout/WorkspaceAuthBoundary.test.tsx ../well-tutored/src/components/EnquiryForm.test.tsx ../well-tutored/src/pages/TutorProfile.test.tsx"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

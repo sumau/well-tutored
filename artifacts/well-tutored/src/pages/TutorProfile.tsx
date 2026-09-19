@@ -1,5 +1,6 @@
 import { useParams } from "wouter";
-import { useGetTutor, getGetTutorQueryKey } from "@workspace/api-client-react";
+import * as React from "react";
+import { useGetTutor, getGetTutorQueryKey, type Tutor } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ErrorState } from "@/components/ErrorState";
@@ -12,6 +13,16 @@ const availabilityDescriptions = {
   limited: "Limited availability",
   unavailable: "Not currently accepting enquiries",
 } as const;
+
+export function TutorEnquiry({ tutor }: { tutor: Tutor }) {
+  return tutor.availability === "unavailable" ? (
+    <div className="bg-card p-8 text-sm text-muted-foreground leading-[1.6]" data-testid="tutor-enquiry-unavailable">
+      {tutor.name} is not currently accepting enquiries. Please check back later or choose another tutor.
+    </div>
+  ) : (
+    <EnquiryForm tutor={tutor} compact={true} />
+  );
+}
 
 export default function TutorProfile() {
   const { slug } = useParams<{ slug: string }>();
@@ -220,13 +231,7 @@ export default function TutorProfile() {
             </div>
           </div>
           
-          {tutor.availability === "unavailable" ? (
-            <div className="bg-card p-8 text-sm text-muted-foreground leading-[1.6]" data-testid="tutor-enquiry-unavailable">
-              {tutor.name} is not currently accepting enquiries. Please check back later or choose another tutor.
-            </div>
-          ) : (
-            <EnquiryForm tutor={tutor} compact={true} />
-          )}
+          <TutorEnquiry tutor={tutor} />
         </div>
       </section>
     </main>

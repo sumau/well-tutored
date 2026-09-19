@@ -114,6 +114,42 @@ async function publishedAcceptingTutor(
   return tutor;
 }
 
+async function publishedUnavailableTutor(
+  page: Page,
+  baseUrl: URL,
+  timeoutMs: number,
+) {
+  const response = await page.request.get(
+    new URL("/api/tutors", baseUrl).toString(),
+    { timeout: timeoutMs },
+  );
+  if (!response.ok()) {
+    throw new BrowserSmokeCheckError(
+      `Could not load published tutors before the unavailable profile check (HTTP ${response.status()}).`,
+    );
+  }
+
+  const tutors: unknown = await response.json();
+  if (!Array.isArray(tutors)) {
+    throw new BrowserSmokeCheckError(
+      "The published tutor catalogue was not an array.",
+    );
+  }
+
+  const tutor = tutors.find(
+    (candidate): candidate is { slug: string; name: string } =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      typeof (candidate as { slug?: unknown }).slug === "string" &&
+      typeof (candidate as { name?: unknown }).name === "string" &&
+      (candidate as { availability?: unknown }).availability === "unavailable",
+  );
+  if (!tutor) {
+    return undefined;
+  }
+  return tutor;
+}
+
 async function runTutorProfileSmokeCheck(
   page: Page,
   baseUrl: URL,
@@ -173,6 +209,48 @@ async function runTutorProfileSmokeCheck(
   await expectSuccessfulReceipt(page, timeoutMs);
 
   console.log(`  ✓ tutor profile keyboard enquiry for ${tutor.name}`);
+
+  const unavailableTutor = await publishedUnavailableTutor(page, baseUrl, timeoutMs);
+  if (!unavailableTutor) {
+    console.log("  - unavailable tutor profile check skipped because none are published");
+    return;
+  }
+
+  await page.goto(
+    new URL(
+      `/tutors/${encodeURIComponent(unavailableTutor.slug)}#enquire`,
+      baseUrl,
+    ).toString(),
+    {
+      waitUntil: "domcontentloaded",
+      timeout: timeoutMs,
+    },
+  );
+
+  const unavailableNotice = page.locator("[data-testid=tutor-enquiry-unavailable]");
+  await unavailableNotice.waitFor({ state: "visible", timeout: timeoutMs });
+  if (!(await unavailableNotice.innerText()).includes("not currently accepting enquiries")) {
+    throw new BrowserSmokeCheckError(
+      "The unavailable tutor profile did not explain that enquiries are unavailable.",
+    );
+  }
+  if (await page.locator("[data-testid=enquiry-form]").count() !== 0) {
+    throw new BrowserSmokeCheckError(
+      "The unavailable tutor profile unexpectedly rendered an enquiry form.",
+    );
+  }
+  if (await page.locator("#enquiry-tutor").count() !== 0) {
+    throw new BrowserSmokeCheckError(
+      "The unavailable tutor profile unexpectedly rendered a preselected tutor control.",
+    );
+  }
+  if (await page.locator("button[type=submit]").count() !== 0) {
+    throw new BrowserSmokeCheckError(
+      "The unavailable tutor profile unexpectedly exposed a submit control.",
+    );
+  }
+
+  console.log(`  ✓ unavailable tutor profile blocks enquiries for ${unavailableTutor.name}`);
 }
 
 async function runBrowserSmokeCheck() {
