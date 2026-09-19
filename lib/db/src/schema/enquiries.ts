@@ -20,7 +20,7 @@ export const enquiriesTable = pgTable("enquiries", {
   studentAge: text("student_age").notNull(),
   subjectLevel: text("subject_level").notNull(),
   message: text("message").notNull(),
-  deliveryStatus: text("delivery_status").notNull().default("stored"),
+  deliveryStatus: text("delivery_status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

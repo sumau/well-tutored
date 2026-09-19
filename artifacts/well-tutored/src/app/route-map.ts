@@ -12,6 +12,7 @@ export const routePaths = {
   },
   workspace: {
     root: "/workspace",
+    enquiries: "/workspace/enquiries",
     wildcard: "/workspace/*?",
     accounts: "/workspace/accounts",
     tutors: "/workspace/tutors",
@@ -38,6 +39,7 @@ export const authRouteDefinitions = [
 
 export const workspaceRouteDefinitions = [
   { path: routePaths.workspace.root, page: "WorkspaceDashboard" },
+  { path: routePaths.workspace.enquiries, page: "WorkspaceEnquiries" },
   { path: routePaths.workspace.accounts, page: "WorkspaceAccounts" },
   { path: routePaths.workspace.tutors, page: "WorkspaceTutorProfiles" },
   { path: routePaths.workspace.profile, page: "WorkspaceProfile" },

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './enquiryDeliveryStatus';
 export * from './enquiryInput';
 export * from './enquiryReceipt';
 export * from './error';
@@ -30,6 +31,7 @@ export * from './workspaceAccount';
 export * from './workspaceAccountRole';
 export * from './workspaceAccountUpdate';
 export * from './workspaceAccountUpdateRole';
+export * from './workspaceEnquiry';
 export * from './workspaceResource';
 export * from './workspaceResourceInput';
 export * from './workspaceResourceStatus';

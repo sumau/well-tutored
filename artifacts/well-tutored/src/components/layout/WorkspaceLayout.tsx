@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, useClerk } from "@clerk/react";
 import { useGetWorkspaceSession } from "@workspace/api-client-react";
-import { FileText, LayoutDashboard, UserRound, UsersRound } from "lucide-react";
+import { FileText, Inbox, LayoutDashboard, UserRound, UsersRound } from "lucide-react";
 
 export function WorkspaceLayout({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -16,6 +16,7 @@ export function WorkspaceLayout({ children }: { children: ReactNode }) {
   });
   const navigation = [
     { href: "/workspace", label: "Overview", icon: LayoutDashboard },
+    { href: "/workspace/enquiries", label: "Enquiries", icon: Inbox },
     { href: "/workspace/profile", label: "Tutor profile", icon: UserRound },
     { href: "/workspace/resources/new", label: "Write resource", icon: FileText },
     ...(session?.role === "owner"

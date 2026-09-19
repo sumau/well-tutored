@@ -202,7 +202,7 @@ export default function TutorProfile() {
               Could {firstName}<br /><em>be your person?</em>
             </h2>
             <p className="text-[#CEC1B4] text-[14px] leading-[1.7]">
-              Tell us a little about the student and what would help. Well Tutored records your named-tutor enquiry securely for review. We never publish or expose tutor email addresses.
+              Tell us a little about the student and what would help. Well Tutored securely delivers your named-tutor enquiry to the team for review. We never publish or expose tutor email addresses.
             </p>
             <div className="mt-[31px] grid gap-[13px]">
               <div className="flex items-center gap-[11px] text-[12px] text-[#E5D8CD]">
@@ -220,7 +220,13 @@ export default function TutorProfile() {
             </div>
           </div>
           
-          <EnquiryForm tutor={tutor} compact={true} />
+          {tutor.availability === "unavailable" ? (
+            <div className="bg-card p-8 text-sm text-muted-foreground leading-[1.6]" data-testid="tutor-enquiry-unavailable">
+              {tutor.name} is not currently accepting enquiries. Please check back later or choose another tutor.
+            </div>
+          ) : (
+            <EnquiryForm tutor={tutor} compact={true} />
+          )}
         </div>
       </section>
     </main>

@@ -23,7 +23,9 @@ export default function Enquiry() {
     );
   }
 
-  if (!tutors?.length) {
+  const contactableTutors = tutors?.filter((tutor) => tutor.availability !== "unavailable") ?? [];
+
+  if (!contactableTutors.length) {
     return (
       <ErrorState
         message="There are no tutors available for enquiries at the moment."
@@ -128,7 +130,7 @@ export default function Enquiry() {
             </Link>
           </div>
 
-          <EnquiryForm tutors={tutors} />
+           <EnquiryForm tutors={contactableTutors} />
         </div>
       </section>
     </main>

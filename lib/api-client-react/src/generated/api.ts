@@ -40,6 +40,7 @@ import type {
   UnauthorizedResponse,
   WorkspaceAccount,
   WorkspaceAccountUpdate,
+  WorkspaceEnquiry,
   WorkspaceResource,
   WorkspaceResourceInput,
   WorkspaceResourceUpdate,
@@ -673,6 +674,181 @@ export const useCreateEnquiry = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getCreateEnquiryMutationOptions(options), queryClient);
+    }
+
+export const getListWorkspaceEnquiriesUrl = () => {
+
+
+
+
+  return `/api/workspace/enquiries`
+}
+
+/**
+ * @summary List enquiries visible to the current staff account
+ */
+export const listWorkspaceEnquiries = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceEnquiry[]> => {
+
+  return customFetch<WorkspaceEnquiry[]>(getListWorkspaceEnquiriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkspaceEnquiriesQueryKey = () => {
+    return [
+    `/api/workspace/enquiries`
+    ] as const;
+    }
+
+
+export const getListWorkspaceEnquiriesQueryOptions = <TData = Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkspaceEnquiriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspaceEnquiries>>> = ({ signal }) => listWorkspaceEnquiries({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListWorkspaceEnquiriesQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkspaceEnquiries>>>
+export type ListWorkspaceEnquiriesQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+
+
+export function useListWorkspaceEnquiries<TData = Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWorkspaceEnquiries>>,
+          TError,
+          Awaited<ReturnType<typeof listWorkspaceEnquiries>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListWorkspaceEnquiries<TData = Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWorkspaceEnquiries>>,
+          TError,
+          Awaited<ReturnType<typeof listWorkspaceEnquiries>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListWorkspaceEnquiries<TData = Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List enquiries visible to the current staff account
+ */
+
+export function useListWorkspaceEnquiries<TData = Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceEnquiries>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListWorkspaceEnquiriesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRetryWorkspaceEnquiryUrl = (id: number,) => {
+
+
+
+
+  return `/api/workspace/enquiries/${id}/retry`
+}
+
+/**
+ * @summary Retry delivery of a failed enquiry
+ */
+export const retryWorkspaceEnquiry = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceEnquiry> => {
+
+  return customFetch<WorkspaceEnquiry>(getRetryWorkspaceEnquiryUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetryWorkspaceEnquiryMutationKey = () => ['retryWorkspaceEnquiry'] as const;
+
+export const getRetryWorkspaceEnquiryMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryWorkspaceEnquiry>>, TError,RetryWorkspaceEnquiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryWorkspaceEnquiry>>, TError,RetryWorkspaceEnquiryMutationVariables, TContext> => {
+
+const mutationKey = getRetryWorkspaceEnquiryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryWorkspaceEnquiry>>, RetryWorkspaceEnquiryMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  retryWorkspaceEnquiry(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryWorkspaceEnquiryMutationResult = NonNullable<Awaited<ReturnType<typeof retryWorkspaceEnquiry>>>
+
+    export type RetryWorkspaceEnquiryMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | Error>
+    export type RetryWorkspaceEnquiryMutationVariables = {id: number}
+
+    /**
+ * @summary Retry delivery of a failed enquiry
+ */
+export const useRetryWorkspaceEnquiry = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryWorkspaceEnquiry>>, TError,RetryWorkspaceEnquiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof retryWorkspaceEnquiry>>,
+        TError,
+        RetryWorkspaceEnquiryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetryWorkspaceEnquiryMutationOptions(options), queryClient);
     }
 
 export const getGetWorkspaceSessionUrl = () => {

@@ -117,6 +117,10 @@ test("resolves signed-in workspace pages and legacy resource redirects", () => {
     kind: "page",
     page: "WorkspaceResourceEditor",
   });
+  assert.deepEqual(resolveRoute("/workspace/enquiries", true), {
+    kind: "page",
+    page: "WorkspaceEnquiries",
+  });
   assert.deepEqual(resolveRoute("/workspace/articles/42", true), {
     kind: "page",
     page: "LegacyWorkspaceResourceRedirect",

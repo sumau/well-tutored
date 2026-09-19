@@ -13,6 +13,7 @@ import NotFound from "@/pages/not-found";
 import SignInPage from "@/pages/auth/sign-in";
 import SignUpPage from "@/pages/auth/sign-up";
 import WorkspaceDashboard from "@/pages/workspace/dashboard";
+import WorkspaceEnquiries from "@/pages/workspace/enquiries";
 import WorkspaceAccounts from "@/pages/workspace/accounts";
 import WorkspaceTutorProfiles from "@/pages/workspace/tutor-profiles";
 import WorkspaceResourceEditor from "@/pages/workspace/resource-editor";
@@ -60,6 +61,7 @@ function WorkspaceRoutes() {
           <WorkspaceAuthBoundary>
             <Switch>
               <Route path={routePaths.workspace.root} component={WorkspaceDashboard} />
+              <Route path={routePaths.workspace.enquiries} component={WorkspaceEnquiries} />
               <Route path={routePaths.workspace.accounts} component={WorkspaceAccounts} />
               <Route path={routePaths.workspace.tutors} component={WorkspaceTutorProfiles} />
               <Route path={routePaths.workspace.profile} component={WorkspaceProfile} />

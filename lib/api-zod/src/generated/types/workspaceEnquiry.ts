@@ -7,10 +7,16 @@
  */
 import type { EnquiryDeliveryStatus } from './enquiryDeliveryStatus';
 
-export interface EnquiryReceipt {
+export interface WorkspaceEnquiry {
   id: number;
+  tutorId: number;
   tutorName: string;
-  receivedAt: Date;
-  deliveryStatus: EnquiryDeliveryStatus;
+  name: string;
+  email: string;
+  studentName: string;
+  studentAge: string;
+  subjectLevel: string;
   message: string;
+  deliveryStatus: EnquiryDeliveryStatus;
+  createdAt: Date;
 }

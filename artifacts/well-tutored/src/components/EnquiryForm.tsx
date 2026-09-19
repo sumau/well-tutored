@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreateEnquiry } from "@workspace/api-client-react";
+import { useCreateEnquiry, type EnquiryReceipt } from "@workspace/api-client-react";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import type { Tutor } from "@workspace/api-client-react";
 
@@ -11,8 +11,7 @@ interface EnquiryFormProps {
 
 export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryFormProps) {
   const createEnquiry = useCreateEnquiry();
-  const [success, setSuccess] = useState(false);
-  const [submittedTutor, setSubmittedTutor] = useState("");
+  const [receipt, setReceipt] = useState<EnquiryReceipt | null>(null);
   const [submitError, setSubmitError] = useState("");
 
   const [form, setForm] = useState({
@@ -44,14 +43,11 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
     if (!isComplete || createEnquiry.isPending) return;
     setSubmitError("");
 
-    const selectedTutorName = tutor?.name || tutors.find(t => t.slug === form.tutorSlug)?.name || form.tutorSlug;
-
     createEnquiry.mutate({
       data: form
     }, {
-      onSuccess: () => {
-        setSubmittedTutor(selectedTutorName);
-        setSuccess(true);
+      onSuccess: (result) => {
+        setReceipt(result);
         setForm({
           name: "",
           email: "",
@@ -68,23 +64,23 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
     });
   };
 
-  if (success) {
+  if (receipt) {
     return (
       <div className={`text-center py-10 px-4 ${compact ? 'bg-card' : ''}`} data-testid="enquiry-success">
-        <div className="w-[50px] h-[50px] bg-accent text-accent-foreground rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className={`w-[50px] h-[50px] ${receipt.deliveryStatus === "delivered" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground"} rounded-full flex items-center justify-center mx-auto mb-6`}>
           <Check size={24} />
         </div>
         <span className="block text-[10px] font-bold tracking-[0.15em] uppercase text-primary mb-3">
-          Message received
+          {receipt.deliveryStatus === "delivered" ? "Message delivered" : receipt.deliveryStatus === "failed" ? "Delivery needs attention" : "Message recorded"}
         </span>
         <h2 className="font-serif text-[32px] md:text-[40px] leading-[1.1] tracking-tight mb-4">
-          Safely received<br /><em>for {submittedTutor}.</em>
+          {receipt.deliveryStatus === "delivered" ? <>Safely delivered<br /><em>to Well Tutored.</em></> : <>Enquiry recorded<br /><em>for {receipt.tutorName}.</em></>}
         </h2>
-        <p className="text-muted-foreground text-[14px] leading-[1.6] max-w-[320px] mx-auto mb-8">
-          Well Tutored has securely recorded your enquiry. Email delivery is not yet enabled in this development version.
+        <p className="text-muted-foreground text-[14px] leading-[1.6] max-w-[360px] mx-auto mb-8">
+          {receipt.message}
         </p>
         <button 
-          onClick={() => setSuccess(false)}
+          onClick={() => setReceipt(null)}
           className="bg-foreground text-background text-[12px] font-bold px-6 py-3.5 hover:bg-primary transition-colors inline-flex items-center justify-center gap-2"
           data-testid="enquiry-reset"
         >
@@ -96,6 +92,12 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
 
   return (
     <div className={`${compact ? 'bg-card p-8' : ''}`} id="enquire" data-testid="enquiry-form-container">
+      {tutor?.availability === "unavailable" ? (
+        <div className="border border-border bg-background p-6 text-sm text-muted-foreground leading-[1.6]" data-testid="enquiry-unavailable">
+          {tutor.name} is not currently accepting enquiries. Please choose another tutor or check back later.
+        </div>
+      ) : (
+      <>
       {compact ? (
         <div className="mb-6">
           <h3 className="font-serif text-[28px] md:text-[32px] tracking-tight mb-2 text-foreground">Make a direct enquiry</h3>
@@ -241,6 +243,8 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
           </p>
         </div>
       </form>
+      </>
+      )}
     </div>
   );
 }

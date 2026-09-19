@@ -15,6 +15,7 @@ import { tutorNameFields } from "../lib/tutor-names";
 import { publicTutorSlug } from "../lib/tutor-slugs";
 import { normalizeTutorTint } from "../lib/tutor-accents";
 import { normalizeResourceType } from "../lib/resource-types";
+import { findPublishedTutor } from "../lib/public-tutors";
 
 const router: IRouter = Router();
 
@@ -103,28 +104,7 @@ router.get("/tutors/:slug", async (req, res): Promise<void> => {
     return;
   }
 
-  let tutor: typeof tutorsTable.$inferSelect | undefined = (
-    await db
-      .select()
-      .from(tutorsTable)
-      .where(
-        and(
-          eq(tutorsTable.slug, params.data.slug),
-          eq(tutorsTable.profileStatus, "published"),
-        ),
-      )
-      .limit(1)
-  )[0];
-
-  if (!tutor) {
-    const publishedTutors = await db
-      .select()
-      .from(tutorsTable)
-      .where(eq(tutorsTable.profileStatus, "published"));
-    tutor = publishedTutors.find(
-      (candidate) => publicTutorSlug(candidate.name) === params.data.slug,
-    );
-  }
+  const tutor = await findPublishedTutor(params.data.slug);
 
   if (!tutor) {
     res.status(404).json({ error: "Tutor not found" });

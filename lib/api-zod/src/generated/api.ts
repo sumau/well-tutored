@@ -232,7 +232,53 @@ export const CreateEnquiryBody = zod.object({
 export const CreateEnquiryResponse = zod.object({
   "id": zod.int(),
   "tutorName": zod.string(),
-  "receivedAt": zod.coerce.date()
+  "receivedAt": zod.coerce.date(),
+  "deliveryStatus": zod.enum(['pending', 'delivered', 'failed']),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary List enquiries visible to the current staff account
+ */
+export const ListWorkspaceEnquiriesResponseItem = zod.object({
+  "id": zod.int(),
+  "tutorId": zod.int(),
+  "tutorName": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "studentName": zod.string(),
+  "studentAge": zod.string(),
+  "subjectLevel": zod.string(),
+  "message": zod.string(),
+  "deliveryStatus": zod.enum(['pending', 'delivered', 'failed']),
+  "createdAt": zod.coerce.date()
+})
+export const ListWorkspaceEnquiriesResponse = zod.array(ListWorkspaceEnquiriesResponseItem)
+
+
+/**
+ * @summary Retry delivery of a failed enquiry
+ */
+
+
+
+export const RetryWorkspaceEnquiryParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const RetryWorkspaceEnquiryResponse = zod.object({
+  "id": zod.int(),
+  "tutorId": zod.int(),
+  "tutorName": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "studentName": zod.string(),
+  "studentAge": zod.string(),
+  "subjectLevel": zod.string(),
+  "message": zod.string(),
+  "deliveryStatus": zod.enum(['pending', 'delivered', 'failed']),
+  "createdAt": zod.coerce.date()
 })
 
 

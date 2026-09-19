@@ -362,10 +362,35 @@ export interface EnquiryInput {
   message: string;
 }
 
+export type EnquiryDeliveryStatus = typeof EnquiryDeliveryStatus[keyof typeof EnquiryDeliveryStatus];
+
+
+export const EnquiryDeliveryStatus = {
+  pending: 'pending',
+  delivered: 'delivered',
+  failed: 'failed',
+} as const;
+
 export interface EnquiryReceipt {
   id: number;
   tutorName: string;
   receivedAt: string;
+  deliveryStatus: EnquiryDeliveryStatus;
+  message: string;
+}
+
+export interface WorkspaceEnquiry {
+  id: number;
+  tutorId: number;
+  tutorName: string;
+  name: string;
+  email: string;
+  studentName: string;
+  studentAge: string;
+  subjectLevel: string;
+  message: string;
+  deliveryStatus: EnquiryDeliveryStatus;
+  createdAt: string;
 }
 
 export interface Error {

@@ -125,6 +125,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /workspace/enquiries:
+    get:
+      operationId: listWorkspaceEnquiries
+      tags: [workspace]
+      summary: List enquiries visible to the current staff account
+      responses:
+        "200":
+          description: Staff enquiry inbox
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceEnquiry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /workspace/enquiries/{id}/retry:
+    post:
+      operationId: retryWorkspaceEnquiry
+      tags: [workspace]
+      summary: Retry delivery of a failed enquiry
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Enquiry delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceEnquiry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: Delivery is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /workspace/me:
     get:
       operationId: getWorkspaceSession
@@ -738,11 +782,33 @@ components:
         message: { type: string, minLength: 10 }
     EnquiryReceipt:
       type: object
-      required: [id, tutorName, receivedAt]
+      required: [id, tutorName, receivedAt, deliveryStatus, message]
       properties:
         id: { type: integer }
         tutorName: { type: string }
         receivedAt: { type: string, format: date-time }
+        deliveryStatus:
+          $ref: "#/components/schemas/EnquiryDeliveryStatus"
+        message: { type: string }
+    EnquiryDeliveryStatus:
+      type: string
+      enum: [pending, delivered, failed]
+    WorkspaceEnquiry:
+      type: object
+      required: [id, tutorId, tutorName, name, email, studentName, studentAge, subjectLevel, message, deliveryStatus, createdAt]
+      properties:
+        id: { type: integer }
+        tutorId: { type: integer }
+        tutorName: { type: string }
+        name: { type: string }
+        email: { type: string }
+        studentName: { type: string }
+        studentAge: { type: string }
+        subjectLevel: { type: string }
+        message: { type: string }
+        deliveryStatus:
+          $ref: "#/components/schemas/EnquiryDeliveryStatus"
+        createdAt: { type: string, format: date-time }
     Error:
       type: object
       required: [error]
