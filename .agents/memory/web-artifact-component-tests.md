@@ -7,4 +7,4 @@ Use the web artifact's TypeScript configuration when running `tsx` tests from an
 
 **Why:** The existing test command runs from the API package, while the component source relies on the web package's Vite/TypeScript aliases. The Node test runtime does not provide Vite's JSX transform.
 
-**How to apply:** Keep component tests on `node:test` and `react-dom/server` when static state rendering is sufficient, and pass the web package tsconfig to `tsx`.
+**How to apply:** Keep component tests on `node:test` and `react-dom/server` when static state rendering is sufficient, and pass the web package tsconfig to `tsx`. For jsdom interaction tests, install the DOM before dynamically importing `react-dom/client`; importing ReactDOM first makes it choose its legacy input-event fallback.
