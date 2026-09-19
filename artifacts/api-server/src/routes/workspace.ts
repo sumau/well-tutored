@@ -1,6 +1,5 @@
-import { Router, type IRouter, type Request, type Response } from "express";
-import { clerkClient, getAuth } from "@clerk/express";
-import { and, asc, count, eq, ilike, ne } from "drizzle-orm";
+import { Router, type IRouter } from "express";
+import { and, asc, count, eq, ne } from "drizzle-orm";
 import {
   CreateWorkspaceResourceBody,
   CreateWorkspaceResourceResponse,
@@ -34,228 +33,37 @@ import {
   tutorsTable,
 } from "@workspace/db";
 import { estimateReadMinutes, truncateAtWordBoundary } from "../lib/text";
-import { splitTutorName, tutorNameFields } from "../lib/tutor-names";
-import { publicTutorSlug, tutorSlugBase } from "../lib/tutor-slugs";
-import {
-  APPROVED_TUTOR_ACCENTS,
-  normalizeTutorTint,
-} from "../lib/tutor-accents";
+import { splitTutorName } from "../lib/tutor-names";
+import { publicTutorSlug } from "../lib/tutor-slugs";
+import { normalizeTutorTint } from "../lib/tutor-accents";
 import { normalizeResourceType } from "../lib/resource-types";
+import {
+  canEdit,
+  requireApproved,
+  requireOwner,
+  requireWorkspaceAccount as workspaceAccount,
+} from "../auth/workspace-access";
+import {
+  availableTutorAccents,
+  isUniqueViolation,
+  uniqueTutorSlug,
+  tutorInitials,
+} from "../services/workspace-account-service";
+import {
+  findJoinedResource,
+  toResourceResponse,
+} from "../presenters/resource-presenter";
+import {
+  applyTutorDraft,
+  findWorkspaceTutor,
+  toTutorResponse,
+} from "../presenters/tutor-presenter";
+import {
+  isPublishableProfile,
+  isPublishableResource,
+} from "../domain/workspace-validation";
 
 const router: IRouter = Router();
-type Account = typeof workspaceAccountsTable.$inferSelect;
-
-function isPublishableResource(resource: {
-  title: string;
-  subject: string;
-  level: string;
-  type: string;
-  excerpt: string;
-  body: string;
-  sections: Array<{ id: string; heading: string; body: string }>;
-}) {
-  return (
-    resource.title.trim().length >= 3 &&
-    resource.subject.trim().length >= 1 &&
-    resource.level.trim().length >= 1 &&
-    ["Study note", "Guide", "Essay", "Revision notes"].includes(resource.type) &&
-    resource.excerpt.trim().length >= 10 &&
-    resource.body.trim().length >= 20 &&
-    resource.sections.every(
-      (section) =>
-        section.id.trim().length >= 1 &&
-        section.heading.trim().length >= 2 &&
-        section.body.trim().length >= 10,
-    )
-  );
-}
-
-function isPublishableProfile(profile: {
-  firstName: string;
-  lastName: string;
-  initials: string;
-  subject: string;
-  profileSummary: string;
-  university: string;
-  qualification: string;
-  bio: string;
-  style: string;
-  teachingIntro: string;
-  teachingPoints: Array<{ title: string; body: string }>;
-  rate: number;
-  availability: string;
-  tint: string;
-}) {
-  return (
-    profile.firstName.trim().length >= 1 &&
-    profile.lastName.trim().length >= 1 &&
-    profile.initials.trim().length >= 1 &&
-    profile.initials.trim().length <= 4 &&
-    profile.subject.trim().length >= 2 &&
-    profile.profileSummary.trim().length <= 200 &&
-    profile.university.trim().length >= 2 &&
-    profile.qualification.trim().length >= 2 &&
-    profile.bio.trim().length >= 20 &&
-    profile.style.trim().length >= 2 &&
-    profile.teachingIntro.trim().length >= 20 &&
-    profile.teachingIntro.trim().length <= 200 &&
-    profile.teachingPoints.length === 3 &&
-    profile.teachingPoints.every(
-      (point) =>
-        point.title.trim().length >= 2 &&
-        point.body.trim().length >= 10,
-    ) &&
-    profile.rate >= 0 &&
-    ["accepting", "limited", "unavailable"].includes(profile.availability) &&
-    APPROVED_TUTOR_ACCENTS.includes(
-      profile.tint as (typeof APPROVED_TUTOR_ACCENTS)[number],
-    )
-  );
-}
-
-async function workspaceAccount(req: Request, res: Response): Promise<Account | null> {
-  const userId = getAuth(req).userId;
-  if (!userId) {
-    res.status(401).json({ error: "Authentication required" });
-    return null;
-  }
-
-  const user = await clerkClient.users.getUser(userId);
-  const primaryEmail = user.emailAddresses.find(
-    (item) => item.id === user.primaryEmailAddressId,
-  );
-  const email = primaryEmail?.emailAddress ?? "";
-
-  const [existing] = await db
-    .select()
-    .from(workspaceAccountsTable)
-    .where(eq(workspaceAccountsTable.clerkUserId, userId))
-    .limit(1);
-
-  if (existing) {
-    if (
-      primaryEmail?.verification?.status === "verified" &&
-      email !== existing.email
-    ) {
-      const [updated] = await db
-        .update(workspaceAccountsTable)
-        .set({ email })
-        .where(eq(workspaceAccountsTable.id, existing.id))
-        .returning();
-      return ensureTutorDraft(updated ?? existing);
-    }
-    return ensureTutorDraft(existing);
-  }
-
-  if (!primaryEmail || primaryEmail.verification?.status !== "verified") {
-    res.status(403).json({
-      error:
-        "Workspace access requires a verified email address.",
-    });
-    return null;
-  }
-
-  const [existingByEmail] = await db
-    .select()
-    .from(workspaceAccountsTable)
-    .where(ilike(workspaceAccountsTable.email, email))
-    .orderBy(asc(workspaceAccountsTable.id))
-    .limit(1);
-  if (existingByEmail) {
-    return ensureTutorDraft(existingByEmail);
-  }
-
-  const displayName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || email;
-
-  const created = await db.transaction(async (tx) => {
-    const [createdByAnotherRequest] = await tx
-      .select()
-      .from(workspaceAccountsTable)
-      .where(eq(workspaceAccountsTable.clerkUserId, userId))
-      .limit(1);
-    if (createdByAnotherRequest) return createdByAnotherRequest;
-
-    const [createdByAnotherEmail] = await tx
-      .select()
-      .from(workspaceAccountsTable)
-      .where(ilike(workspaceAccountsTable.email, email))
-      .orderBy(asc(workspaceAccountsTable.id))
-      .limit(1);
-    if (createdByAnotherEmail) return createdByAnotherEmail;
-
-    const [created] = await tx
-        .insert(workspaceAccountsTable)
-      .values({
-        clerkUserId: userId,
-        email,
-        displayName,
-        role: "pending",
-      })
-      .returning();
-    return created;
-  });
-  return ensureTutorDraft(created);
-}
-
-function requireApproved(account: Account, res: Response): boolean {
-  if (account.role === "pending") {
-    res.status(403).json({ error: "Your workspace account is awaiting approval." });
-    return false;
-  }
-  return true;
-}
-
-function requireOwner(account: Account, res: Response): boolean {
-  if (account.role !== "owner") {
-    res.status(403).json({ error: "Owner access required." });
-    return false;
-  }
-  return true;
-}
-
-function resourceResponse(
-  resource: typeof resourcesTable.$inferSelect,
-  tutor: Pick<typeof tutorsTable.$inferSelect, "name" | "tint">,
-) {
-  return {
-    id: resource.id,
-    slug: resource.slug,
-    tutorId: resource.tutorId,
-    tutorName: tutor.name,
-    title: resource.title,
-    subject: resource.subject,
-    level: resource.level,
-    type: normalizeResourceType(resource.type),
-    readMinutes: estimateReadMinutes(resource.body, resource.sections),
-    excerpt: resource.excerpt,
-    body: resource.body,
-    sections: resource.sections,
-    publishedAt: resource.publishedAt,
-    tint: normalizeTutorTint(tutor.tint),
-    status: resource.status,
-  };
-}
-
-async function joinedResource(id: number) {
-  const [row] = await db
-    .select({
-      resource: resourcesTable,
-      tutor: {
-        name: tutorsTable.name,
-        tint: tutorsTable.tint,
-      },
-    })
-    .from(resourcesTable)
-    .innerJoin(tutorsTable, eq(resourcesTable.tutorId, tutorsTable.id))
-    .where(eq(resourcesTable.id, id))
-    .limit(1);
-  return row;
-}
-
-function canEdit(account: Account, tutorId: number) {
-  return account.role === "owner" || account.tutorId === tutorId;
-}
 
 function slugify(title: string) {
   const base = title
@@ -266,175 +74,6 @@ function slugify(title: string) {
     .replace(/^-|-$/g, "")
     .slice(0, 60);
   return `${base || "resource"}-${Date.now().toString(36).slice(-6)}`;
-}
-
-function tutorInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (parts.length > 1
-    ? parts
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join("")
-    : name.trim().slice(0, 2)
-  ).toUpperCase();
-}
-
-function tutorResponse(
-  tutor: typeof tutorsTable.$inferSelect,
-  resources: unknown[] = [],
-  slug = publicTutorSlug(tutor.name),
-) {
-  return {
-    ...tutor,
-    ...tutorNameFields(tutor),
-    tint: normalizeTutorTint(tutor.tint),
-    teachingIntro: truncateAtWordBoundary(tutor.teachingIntro, 200),
-    slug,
-    rate: Number(tutor.rate),
-    resources,
-  };
-}
-
-function applyTutorDraft(
-  tutor: typeof tutorsTable.$inferSelect,
-  draft: typeof tutorProfileDraftsTable.$inferSelect | undefined,
-) {
-  if (!draft) return tutor;
-  return {
-    ...tutor,
-    name: draft.name,
-    firstName: draft.firstName,
-    lastName: draft.lastName,
-    initials: draft.initials,
-    subject: draft.subject,
-    support: draft.support,
-    profileSummary: draft.profileSummary,
-    university: draft.university,
-    qualification: draft.qualification,
-    bio: draft.bio,
-    style: draft.style,
-    teachingIntro: draft.teachingIntro,
-    teachingPoints: draft.teachingPoints,
-    rate: draft.rate,
-    availability: draft.availability,
-    tint: draft.tint,
-    profileStatus:
-      tutor.profileStatus === "archived" ? ("archived" as const) : ("draft" as const),
-  };
-}
-
-async function workspaceTutor(tutor: typeof tutorsTable.$inferSelect) {
-  const [draft] = await db
-    .select()
-    .from(tutorProfileDraftsTable)
-    .where(eq(tutorProfileDraftsTable.tutorId, tutor.id))
-    .limit(1);
-  return applyTutorDraft(tutor, draft);
-}
-
-async function uniqueTutorSlug(name: string) {
-  const base = tutorSlugBase(name);
-  const tutors = await db
-    .select({ name: tutorsTable.name, slug: tutorsTable.slug })
-    .from(tutorsTable);
-  const usedSlugs = new Set(
-    tutors.flatMap((tutor) => [tutor.slug, tutorSlugBase(tutor.name)]),
-  );
-
-  let candidate = base;
-  let suffix = 2;
-  while (usedSlugs.has(candidate)) {
-    candidate = `${base}-${suffix}`;
-    suffix += 1;
-  }
-  return candidate;
-}
-
-async function availableTutorAccents(tutorId: number | null) {
-  const tutors = await db
-    .select({ id: tutorsTable.id, tint: tutorsTable.tint })
-    .from(tutorsTable);
-  const currentTint = tutorId == null
-    ? null
-    : tutors.find((tutor) => tutor.id === tutorId)?.tint;
-  const usedByOthers = new Set(
-    tutors
-      .filter((tutor) => tutor.id !== tutorId)
-      .map((tutor) => normalizeTutorTint(tutor.tint)),
-  );
-
-  return APPROVED_TUTOR_ACCENTS.filter(
-    (accent) =>
-      !usedByOthers.has(accent) ||
-      (currentTint != null && normalizeTutorTint(currentTint) === accent),
-  );
-}
-
-async function ensureTutorDraft(account: Account): Promise<Account> {
-  if (account.role !== "tutor" || account.tutorId != null) return account;
-
-  const [defaultTint] = await availableTutorAccents(null);
-  if (!defaultTint) return account;
-
-  const displayName = account.displayName.trim() || account.email;
-  const { firstName, lastName } = splitTutorName(displayName);
-  const name = [firstName, lastName].filter(Boolean).join(" ") || displayName;
-  const tutorSlug = await uniqueTutorSlug(name);
-  const [{ value: tutorCount }] = await db
-    .select({ value: count() })
-    .from(tutorsTable);
-
-  return db.transaction(async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(workspaceAccountsTable)
-      .where(eq(workspaceAccountsTable.id, account.id))
-      .limit(1);
-    if (!current || current.role !== "tutor" || current.tutorId != null) {
-      return current ?? account;
-    }
-
-    const [tutor] = await tx
-      .insert(tutorsTable)
-      .values({
-        name,
-        firstName,
-        lastName,
-        initials: tutorInitials(name),
-        subject: "",
-        support: "",
-        university: "",
-        qualification: "",
-        bio: "",
-        style: "",
-        profileSummary: "",
-        teachingIntro: "",
-        teachingPoints: [],
-        rate: "0",
-        availability: "unavailable",
-        tint: defaultTint,
-        profileStatus: "draft",
-        slug: tutorSlug,
-        sortOrder: Number(tutorCount),
-      })
-      .returning();
-
-    const [updated] = await tx
-      .update(workspaceAccountsTable)
-      .set({ tutorId: tutor.id })
-      .where(eq(workspaceAccountsTable.id, current.id))
-      .returning();
-    return updated ?? current;
-  });
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
 }
 
 router.get("/workspace/me", async (req, res): Promise<void> => {
@@ -448,7 +87,7 @@ router.get("/workspace/me", async (req, res): Promise<void> => {
         .where(eq(tutorsTable.id, account.tutorId))
         .limit(1)
     : [];
-  const editableTutor = tutor ? await workspaceTutor(tutor) : undefined;
+  const editableTutor = tutor ? await findWorkspaceTutor(tutor) : undefined;
 
   res.json(
     GetWorkspaceSessionResponse.parse({
@@ -458,7 +97,7 @@ router.get("/workspace/me", async (req, res): Promise<void> => {
       displayName: account.displayName,
       availableTutorAccents: await availableTutorAccents(account.tutorId),
       tutor: editableTutor
-        ? tutorResponse(
+        ? toTutorResponse(
             editableTutor,
             [],
             publicTutorSlug(tutor?.name ?? editableTutor.name),
@@ -486,7 +125,7 @@ router.get(["/workspace/resources", "/workspace/articles"], async (req, res): Pr
     .orderBy(asc(resourcesTable.id));
   res.json(
     ListWorkspaceResourcesResponse.parse(
-      rows.map((row) => resourceResponse(row.resource, row.tutor)),
+      rows.map((row) => toResourceResponse(row.resource, row.tutor)),
     ),
   );
 });
@@ -532,7 +171,7 @@ router.post(["/workspace/resources", "/workspace/articles"], async (req, res): P
     .returning();
   res
     .status(201)
-    .json(CreateWorkspaceResourceResponse.parse(resourceResponse(resource, tutor)));
+    .json(CreateWorkspaceResourceResponse.parse(toResourceResponse(resource, tutor)));
 });
 
 router.patch(["/workspace/resources/:id", "/workspace/articles/:id"], async (req, res): Promise<void> => {
@@ -544,7 +183,7 @@ router.patch(["/workspace/resources/:id", "/workspace/articles/:id"], async (req
     res.status(400).json({ error: "Please check the resource fields." });
     return;
   }
-  const current = await joinedResource(params.data.id);
+  const current = await findJoinedResource(params.data.id);
   if (!current) {
     res.status(404).json({ error: "Resource not found" });
     return;
@@ -586,7 +225,7 @@ router.patch(["/workspace/resources/:id", "/workspace/articles/:id"], async (req
     .returning();
   res.json(
       UpdateWorkspaceResourceResponse.parse(
-        resourceResponse(updated, current.tutor),
+        toResourceResponse(updated, current.tutor),
     ),
   );
 });
@@ -599,7 +238,7 @@ router.delete(["/workspace/resources/:id", "/workspace/articles/:id"], async (re
     res.status(400).json({ error: "Invalid resource." });
     return;
   }
-  const current = await joinedResource(params.data.id);
+  const current = await findJoinedResource(params.data.id);
   if (!current) {
     res.status(404).json({ error: "Resource not found" });
     return;
@@ -798,7 +437,7 @@ router.patch("/workspace/profile", async (req, res): Promise<void> => {
     );
   res.json(
     UpdateWorkspaceProfileResponse.parse({
-      ...tutorResponse(
+      ...toTutorResponse(
         tutor,
         resources.map(({ resource, tutor: author }) => ({
           ...resource,
@@ -864,7 +503,7 @@ router.delete("/workspace/profile/draft", async (req, res): Promise<void> => {
 
   res.json(
     DiscardWorkspaceProfileDraftResponse.parse(
-      tutorResponse(
+      toTutorResponse(
         tutor,
         resources.map(({ resource, author }) => ({
           ...resource,
@@ -892,7 +531,7 @@ router.get("/workspace/tutors", async (req, res): Promise<void> => {
   res.json(
     ListWorkspaceTutorsResponse.parse(
       tutors.map((tutor) =>
-        tutorResponse(
+        toTutorResponse(
             tutor,
           [],
           publicTutorSlug(tutor.name),
@@ -948,7 +587,7 @@ router.post("/workspace/tutors", async (req, res): Promise<void> => {
     .returning();
 
   res.status(201).json(
-    CreateWorkspaceTutorResponse.parse(tutorResponse(tutor)),
+    CreateWorkspaceTutorResponse.parse(toTutorResponse(tutor)),
   );
 });
 
@@ -978,7 +617,7 @@ router.post("/workspace/tutors/:id", async (req, res): Promise<void> => {
     .where(eq(tutorsTable.id, params.data.id))
     .returning();
 
-  res.json(ArchiveWorkspaceTutorResponse.parse(tutorResponse(archived)));
+  res.json(ArchiveWorkspaceTutorResponse.parse(toTutorResponse(archived)));
 });
 
 router.put("/workspace/tutors/:id", async (req, res): Promise<void> => {
@@ -1007,7 +646,7 @@ router.put("/workspace/tutors/:id", async (req, res): Promise<void> => {
     .where(eq(tutorsTable.id, params.data.id))
     .returning();
 
-  res.json(RestoreWorkspaceTutorResponse.parse(tutorResponse(restored)));
+  res.json(RestoreWorkspaceTutorResponse.parse(toTutorResponse(restored)));
 });
 
 router.delete("/workspace/tutors/:id", async (req, res): Promise<void> => {

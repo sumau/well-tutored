@@ -7,7 +7,7 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "test": "tsx --test src/routes/workspace.lifecycle.test.ts src/lib/resource-types.test.ts",
+    "test": "tsx --test src/routes/workspace.lifecycle.test.ts src/lib/resource-types.test.ts src/domain/workspace-validation.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
