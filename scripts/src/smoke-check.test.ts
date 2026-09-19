@@ -27,7 +27,7 @@ type Fixture = {
 
 const tutor = {
   id: 1,
-  slug: "ada-lovelace",
+  slug: "ada lovelace",
   name: "Ada Lovelace",
   subject: "Mathematics",
   resources: [],
@@ -35,7 +35,7 @@ const tutor = {
 
 const resource = {
   id: 2,
-  slug: "learning-mathematics",
+  slug: "learning & mathematics",
   title: "Learning Mathematics",
   tutorSlug: tutor.slug,
   tutorName: tutor.name,
@@ -92,8 +92,8 @@ function writeHealthyResponse(
     path === "/" ||
     path === "/resources" ||
     path === "/enquire" ||
-    path === `/tutors/${tutor.slug}` ||
-    path === `/resources/${resource.slug}`
+    path === `/tutors/${encodeURIComponent(tutor.slug)}` ||
+    path === `/resources/${encodeURIComponent(resource.slug)}`
   ) {
     writePage(response);
     return;
@@ -391,8 +391,8 @@ test("healthy launch checks pass entirely against the loopback fixture", async (
       "/",
       "/resources",
       "/enquire",
-      "/tutors/ada-lovelace",
-      "/resources/learning-mathematics",
+      "/tutors/ada%20lovelace",
+      "/resources/learning%20%26%20mathematics",
       "POST /api/enquiries (invalid payload)",
       "/api/healthz after invalid enquiry",
     ];
@@ -419,8 +419,8 @@ test("healthy launch checks pass entirely against the loopback fixture", async (
       "GET /",
       "GET /resources",
       "GET /enquire",
-      "GET /tutors/ada-lovelace",
-      "GET /resources/learning-mathematics",
+      "GET /tutors/ada%20lovelace",
+      "GET /resources/learning%20%26%20mathematics",
       "POST /api/enquiries",
       "GET /api/healthz",
     ]);

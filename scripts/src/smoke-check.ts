@@ -413,20 +413,14 @@ export async function runSmokeCheck() {
   }
 
   const tutorSlug = parsedTutors[0].slug as string;
-  await checkPublicPage(
-    baseUrl,
-    `/tutors/${encodeURIComponent(tutorSlug)}`,
-    timeoutMs,
-  );
-  passed.push(`/tutors/${tutorSlug}`);
+  const tutorPath = `/tutors/${encodeURIComponent(tutorSlug)}`;
+  await checkPublicPage(baseUrl, tutorPath, timeoutMs);
+  passed.push(tutorPath);
 
   const resourceSlug = parsedResources[0].slug as string;
-  await checkPublicPage(
-    baseUrl,
-    `/resources/${encodeURIComponent(resourceSlug)}`,
-    timeoutMs,
-  );
-  passed.push(`/resources/${resourceSlug}`);
+  const resourcePath = `/resources/${encodeURIComponent(resourceSlug)}`;
+  await checkPublicPage(baseUrl, resourcePath, timeoutMs);
+  passed.push(resourcePath);
 
   const invalidEnquiry = await request(baseUrl, "/api/enquiries", timeoutMs, {
     method: "POST",
