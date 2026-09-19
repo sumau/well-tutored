@@ -22,20 +22,20 @@ one-time provisioning step, not application startup behavior.
 5. Run a guarded, development-only update for the exact target email:
 
    ```sql
-   UPDATE studio_accounts
+   UPDATE workspace_accounts
    SET role = 'owner', updated_at = NOW()
    WHERE lower(email) = lower($1)
      AND role = 'pending'
      AND NOT EXISTS (
        SELECT 1
-       FROM studio_accounts
+        FROM workspace_accounts
        WHERE role = 'owner'
      )
    RETURNING id, role;
    ```
 
-   Supply the intended owner email as the parameter. The `studio_accounts`
-   table name is a legacy database identifier and is intentionally unchanged.
+    Supply the intended owner email as the parameter. The table is named
+    `workspace_accounts` to match the application vocabulary.
 
 6. Sign in again and open the Workspace. The new owner can then approve users,
    assign tutor profiles, and manage Workspace content through the UI.

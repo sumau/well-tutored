@@ -16,7 +16,7 @@ export const workspaceAccountRole = pgEnum("studio_account_role", [
   "pending",
 ]);
 
-export const workspaceAccountsTable = pgTable("studio_accounts", {
+export const workspaceAccountsTable = pgTable("workspace_accounts", {
   id: serial("id").primaryKey(),
   clerkUserId: text("clerk_user_id").notNull().unique(),
   email: text("email").notNull(),
