@@ -9,7 +9,10 @@ const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
 const PRODUCTION_URL_CONFIG_KEY = "SMOKE_PRODUCTION_URL";
 const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
 const PUBLISHING_OUTPUT_URL_ENV_KEY = "REPLIT_PUBLISHED_URL";
+export const SMOKE_TIMEOUT_MIN_MS = 100;
+export const SMOKE_TIMEOUT_MAX_MS = 60_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
+const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
 const PUBLISHED_CHECK_FLAG = "--published";
 
 type JsonRecord = Record<string, unknown>;
@@ -216,10 +219,19 @@ export function resolveBaseUrl(): URL {
 }
 
 export function resolveTimeoutMs(): number {
-  const configured = Number(process.env.SMOKE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  if (!Number.isFinite(configured) || configured <= 0) {
+  const rawConfigured = process.env.SMOKE_TIMEOUT_MS;
+  const configured =
+    rawConfigured === undefined ? DEFAULT_TIMEOUT_MS : Number(rawConfigured);
+  if (
+    (rawConfigured !== undefined &&
+      !SMOKE_TIMEOUT_FORMAT.test(rawConfigured)) ||
+    !Number.isSafeInteger(configured) ||
+    configured < SMOKE_TIMEOUT_MIN_MS ||
+    configured > SMOKE_TIMEOUT_MAX_MS
+  ) {
     throw new SmokeCheckError(
-      `SMOKE_TIMEOUT_MS must be a positive number; received "${process.env.SMOKE_TIMEOUT_MS}".`,
+      `SMOKE_TIMEOUT_MS must be an integer number of milliseconds between ` +
+        `${SMOKE_TIMEOUT_MIN_MS} and ${SMOKE_TIMEOUT_MAX_MS}; received "${rawConfigured}".`,
     );
   }
   return configured;

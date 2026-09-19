@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
+import {
+  SMOKE_TIMEOUT_MAX_MS,
+  SMOKE_TIMEOUT_MIN_MS,
+} from "./smoke-check.js";
 
 type FailureCase = {
   name: string;
@@ -412,33 +416,46 @@ test("malformed SMOKE_BASE_URL fails before contacting loopback or production", 
   }
 });
 
-for (const timeoutMs of ["not-a-number", "0", "-1"]) {
-  test(`invalid SMOKE_TIMEOUT_MS="${timeoutMs}" fails before making requests`, async () => {
-    const fixture = await startFixture({
-      name: `unused timeout validation fixture (${timeoutMs})`,
-      expectedMessage: "",
-      respond: () => false,
-    });
+for (const timeoutMs of [
+  "not-a-number",
+  "0",
+  "-1",
+  "100.5",
+  String(SMOKE_TIMEOUT_MAX_MS + 1),
+  "Infinity",
+  "NaN",
+]) {
+  test(
+    `invalid SMOKE_TIMEOUT_MS="${timeoutMs}" fails before making requests ` +
+      `(supported range: ${SMOKE_TIMEOUT_MIN_MS}-${SMOKE_TIMEOUT_MAX_MS}ms integers)`,
+    async () => {
+      const fixture = await startFixture({
+        name: `unused timeout validation fixture (${timeoutMs})`,
+        expectedMessage: "",
+        respond: () => false,
+      });
 
-    try {
-      const result = await runSmokeCommand(fixture.url, { timeoutMs });
+      try {
+        const result = await runSmokeCommand(fixture.url, { timeoutMs });
 
-      assert.notEqual(result.exitCode, 0, result.output);
-      assert.match(
-        result.output,
-        new RegExp(
-          `SMOKE_TIMEOUT_MS must be a positive number; received "${timeoutMs.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&",
-          )}"\\.`,
-        ),
-      );
-      assert.deepEqual(fixture.requests, []);
-      assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-    } finally {
-      await fixture.close();
-    }
-  });
+        assert.notEqual(result.exitCode, 0, result.output);
+        assert.match(
+          result.output,
+          new RegExp(
+            `SMOKE_TIMEOUT_MS must be an integer number of milliseconds between ` +
+              `${SMOKE_TIMEOUT_MIN_MS} and ${SMOKE_TIMEOUT_MAX_MS}; received "${timeoutMs.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&",
+              )}"\\.`,
+          ),
+        );
+        assert.deepEqual(fixture.requests, []);
+        assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+      } finally {
+        await fixture.close();
+      }
+    },
+  );
 }
 
 test("published check rejects missing current deployment metadata", async () => {
@@ -512,6 +529,32 @@ test("published target checks reject responses redirected to a different origin"
     await fixture.close();
   }
 });
+
+test(
+  `SMOKE_TIMEOUT_MS accepts the supported boundaries ` +
+    `(${SMOKE_TIMEOUT_MIN_MS}-${SMOKE_TIMEOUT_MAX_MS}ms)`,
+  async () => {
+    for (const timeoutMs of [
+      SMOKE_TIMEOUT_MIN_MS,
+      SMOKE_TIMEOUT_MAX_MS,
+    ]) {
+      const fixture = await startFixture({
+        name: `timeout boundary fixture (${timeoutMs})`,
+        expectedMessage: "",
+        respond: () => false,
+      });
+
+      try {
+        const result = await runSmokeCommand(fixture.url, {
+          timeoutMs: String(timeoutMs),
+        });
+        assert.equal(result.exitCode, 0, result.output);
+      } finally {
+        await fixture.close();
+      }
+    }
+  },
+);
 
 test("healthy launch checks pass entirely against the loopback fixture", async () => {
   const fixture = await startFixture({
