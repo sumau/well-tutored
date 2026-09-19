@@ -30,8 +30,9 @@ Workspace routes are protected by Clerk and the workspace account boundary:
 - `/workspace/accounts` — owner-only account approval and tutor assignment
 
 `/workspace/articles/...` remains a compatibility alias and redirects to the
-canonical resource URLs. The physical database identifiers retain their legacy
-names where changing them would create migration risk.
+canonical resource URLs. Workspace accounts are stored in the
+`workspace_accounts` table; the existing `studio_account_role` enum remains a
+legacy database identifier to avoid an unnecessary second schema migration.
 
 ## API boundaries
 
