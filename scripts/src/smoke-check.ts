@@ -154,12 +154,18 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
   }
 
   if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
-    const publishedUrl =
-      process.env[PUBLISHED_URL_ENV_KEY]?.trim() ||
-      process.env[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim();
+    const publishedUrlSource = process.env[PUBLISHED_URL_ENV_KEY]?.trim()
+      ? PUBLISHED_URL_ENV_KEY
+      : process.env[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim()
+        ? PUBLISHING_OUTPUT_URL_ENV_KEY
+        : undefined;
+    const publishedUrl = publishedUrlSource
+      ? process.env[publishedUrlSource]?.trim()
+      : undefined;
     if (!publishedUrl) {
       throw new SmokeCheckError(
-        `Published launch check requires ${PUBLISHED_URL_ENV_KEY} from the current Publishing metadata. ` +
+        `Published launch check requires ${PUBLISHED_URL_ENV_KEY} or ` +
+          `${PUBLISHING_OUTPUT_URL_ENV_KEY} from the current Publishing metadata. ` +
           `The publish lifecycle must provide ${PUBLISHING_OUTPUT_URL_ENV_KEY}, ` +
           `or set ${PUBLISHED_URL_ENV_KEY} manually. ` +
           `Set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
@@ -169,7 +175,7 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
     const artifactUrl = resolveArtifactProductionUrl();
     const publishedOrigin = parseHttpUrl(
       publishedUrl,
-      PUBLISHED_URL_ENV_KEY,
+      publishedUrlSource ?? PUBLISHED_URL_ENV_KEY,
     ).origin;
     const artifactOrigin = parseHttpUrl(
       artifactUrl.value,
@@ -178,7 +184,7 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
 
     if (publishedOrigin !== artifactOrigin) {
       throw new SmokeCheckError(
-        `Published deployment URL (${PUBLISHED_URL_ENV_KEY}) "${publishedOrigin}" ` +
+        `Published deployment URL (${publishedUrlSource ?? PUBLISHED_URL_ENV_KEY}) "${publishedOrigin}" ` +
           `does not match the Well Tutored artifact smoke target ` +
           `(${PRODUCTION_URL_CONFIG_KEY}) "${artifactOrigin}". ` +
           `Update ${PRODUCTION_URL_CONFIG_KEY} in ` +
@@ -187,7 +193,10 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
       );
     }
 
-    return { value: publishedUrl, source: PUBLISHED_URL_ENV_KEY };
+    return {
+      value: publishedUrl,
+      source: publishedUrlSource ?? PUBLISHED_URL_ENV_KEY,
+    };
   }
 
   return resolveArtifactProductionUrl();

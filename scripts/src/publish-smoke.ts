@@ -6,13 +6,25 @@ const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
 const PUBLISHING_OUTPUT_URL_ENV_KEY = "REPLIT_PUBLISHED_URL";
 const SMOKE_BASE_URL_ENV_KEY = "SMOKE_BASE_URL";
 
+export type PublishedUrl = {
+  value: string;
+  source: typeof PUBLISHED_URL_ENV_KEY | typeof PUBLISHING_OUTPUT_URL_ENV_KEY;
+};
+
 export function resolvePublishedUrl(
   environment: NodeJS.ProcessEnv = process.env,
-): string | undefined {
-  return (
-    environment[PUBLISHED_URL_ENV_KEY]?.trim() ||
-    environment[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim()
-  );
+): PublishedUrl | undefined {
+  const explicitSmokeUrl = environment[PUBLISHED_URL_ENV_KEY]?.trim();
+  if (explicitSmokeUrl) {
+    return { value: explicitSmokeUrl, source: PUBLISHED_URL_ENV_KEY };
+  }
+
+  const publishingOutputUrl = environment[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim();
+  if (publishingOutputUrl) {
+    return { value: publishingOutputUrl, source: PUBLISHING_OUTPUT_URL_ENV_KEY };
+  }
+
+  return undefined;
 }
 
 function failWithoutPublishingUrl(): never {
@@ -38,7 +50,9 @@ export function runPublishedSmoke(
     {
       env: {
         ...environment,
-        ...(publishedUrl ? { [PUBLISHED_URL_ENV_KEY]: publishedUrl } : {}),
+        ...(publishedUrl
+          ? { [publishedUrl.source]: publishedUrl.value }
+          : {}),
       },
       stdio: "inherit",
     },

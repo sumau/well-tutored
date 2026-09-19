@@ -3,21 +3,27 @@ import { test } from "node:test";
 import { resolvePublishedUrl } from "./publish-smoke.js";
 
 test("publish lifecycle prefers an explicit smoke URL", () => {
-  assert.equal(
+  assert.deepEqual(
     resolvePublishedUrl({
       SMOKE_PUBLISHED_URL: "https://explicit.example",
       REPLIT_PUBLISHED_URL: "https://publishing-output.example",
     }),
-    "https://explicit.example",
+    {
+      value: "https://explicit.example",
+      source: "SMOKE_PUBLISHED_URL",
+    },
   );
 });
 
 test("publish lifecycle copies the current Publishing output URL", () => {
-  assert.equal(
+  assert.deepEqual(
     resolvePublishedUrl({
       REPLIT_PUBLISHED_URL: "https://publishing-output.example",
     }),
-    "https://publishing-output.example",
+    {
+      value: "https://publishing-output.example",
+      source: "REPLIT_PUBLISHED_URL",
+    },
   );
 });
 

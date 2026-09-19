@@ -289,6 +289,7 @@ function runSmokeCommand(
   options: {
     published?: boolean;
     publishedUrl?: string;
+    publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
     timeoutMs?: string;
   } = {},
 ): Promise<{
@@ -309,10 +310,17 @@ function runSmokeCommand(
       env: {
         ...process.env,
         ...(baseUrl ? { SMOKE_BASE_URL: baseUrl } : { SMOKE_BASE_URL: "" }),
-        ...(options.publishedUrl
-          ? { SMOKE_PUBLISHED_URL: options.publishedUrl }
-          : { SMOKE_PUBLISHED_URL: "" }),
-        REPLIT_PUBLISHED_URL: "",
+        SMOKE_PUBLISHED_URL:
+          options.publishedUrl &&
+          (options.publishedUrlSource ?? "SMOKE_PUBLISHED_URL") ===
+            "SMOKE_PUBLISHED_URL"
+            ? options.publishedUrl
+            : "",
+        REPLIT_PUBLISHED_URL:
+          options.publishedUrl &&
+          options.publishedUrlSource === "REPLIT_PUBLISHED_URL"
+            ? options.publishedUrl
+            : "",
         SMOKE_TIMEOUT_MS: options.timeoutMs ?? "2000",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -349,6 +357,32 @@ test("malformed SMOKE_PUBLISHED_URL fails before contacting loopback or producti
     assert.match(
       result.output,
       /SMOKE_PUBLISHED_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
+    );
+    assert.deepEqual(fixture.requests, []);
+    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("malformed REPLIT_PUBLISHED_URL fails before contacting loopback or production", async () => {
+  const fixture = await startFixture({
+    name: "unused Publishing output URL validation fixture",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(undefined, {
+      published: true,
+      publishedUrl: "not-a-url",
+      publishedUrlSource: "REPLIT_PUBLISHED_URL",
+    });
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /REPLIT_PUBLISHED_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
     );
     assert.deepEqual(fixture.requests, []);
     assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
@@ -464,7 +498,7 @@ test("published check rejects missing current deployment metadata", async () => 
   assert.notEqual(result.exitCode, 0, result.output);
   assert.match(
     result.output,
-    /Published launch check requires SMOKE_PUBLISHED_URL from the current Publishing metadata/,
+    /Published launch check requires SMOKE_PUBLISHED_URL or REPLIT_PUBLISHED_URL from the current Publishing metadata/,
   );
 });
 
