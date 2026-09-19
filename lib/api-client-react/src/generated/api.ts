@@ -40,9 +40,9 @@ import type {
   UnauthorizedResponse,
   WorkspaceAccount,
   WorkspaceAccountUpdate,
-  WorkspaceArticle,
-  WorkspaceArticleInput,
-  WorkspaceArticleUpdate,
+  WorkspaceResource,
+  WorkspaceResourceInput,
+  WorkspaceResourceUpdate,
   WorkspaceSession,
   WorkspaceTutor
 } from './api.schemas';
@@ -776,20 +776,20 @@ export function useGetWorkspaceSession<TData = Awaited<ReturnType<typeof getWork
 
 
 
-export const getListWorkspaceArticlesUrl = () => {
+export const getListWorkspaceResourcesUrl = () => {
 
 
 
 
-  return `/api/workspace/articles`
+  return `/api/workspace/resources`
 }
 
 /**
- * @summary List articles editable by the current account
+ * @summary List resources editable by the current account
  */
-export const listWorkspaceArticles = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceArticle[]> => {
+export const listWorkspaceResources = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceResource[]> => {
 
-  return customFetch<WorkspaceArticle[]>(getListWorkspaceArticlesUrl(),
+  return customFetch<WorkspaceResource[]>(getListWorkspaceResourcesUrl(),
   {
     ...options,
     method: 'GET'
@@ -802,69 +802,69 @@ export const listWorkspaceArticles = async ( options?: Parameters<typeof customF
 
 
 
-export const getListWorkspaceArticlesQueryKey = () => {
+export const getListWorkspaceResourcesQueryKey = () => {
     return [
-    `/api/workspace/articles`
+    `/api/workspace/resources`
     ] as const;
     }
 
 
-export const getListWorkspaceArticlesQueryOptions = <TData = Awaited<ReturnType<typeof listWorkspaceArticles>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getListWorkspaceResourcesQueryOptions = <TData = Awaited<ReturnType<typeof listWorkspaceResources>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListWorkspaceArticlesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListWorkspaceResourcesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspaceArticles>>> = ({ signal }) => listWorkspaceArticles({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspaceResources>>> = ({ signal }) => listWorkspaceResources({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type ListWorkspaceArticlesQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkspaceArticles>>>
-export type ListWorkspaceArticlesQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
+export type ListWorkspaceResourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkspaceResources>>>
+export type ListWorkspaceResourcesQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse>
 
 
-export function useListWorkspaceArticles<TData = Awaited<ReturnType<typeof listWorkspaceArticles>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData>> & Pick<
+export function useListWorkspaceResources<TData = Awaited<ReturnType<typeof listWorkspaceResources>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listWorkspaceArticles>>,
+          Awaited<ReturnType<typeof listWorkspaceResources>>,
           TError,
-          Awaited<ReturnType<typeof listWorkspaceArticles>>
+          Awaited<ReturnType<typeof listWorkspaceResources>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListWorkspaceArticles<TData = Awaited<ReturnType<typeof listWorkspaceArticles>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData>> & Pick<
+export function useListWorkspaceResources<TData = Awaited<ReturnType<typeof listWorkspaceResources>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listWorkspaceArticles>>,
+          Awaited<ReturnType<typeof listWorkspaceResources>>,
           TError,
-          Awaited<ReturnType<typeof listWorkspaceArticles>>
+          Awaited<ReturnType<typeof listWorkspaceResources>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListWorkspaceArticles<TData = Awaited<ReturnType<typeof listWorkspaceArticles>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListWorkspaceResources<TData = Awaited<ReturnType<typeof listWorkspaceResources>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List articles editable by the current account
+ * @summary List resources editable by the current account
  */
 
-export function useListWorkspaceArticles<TData = Awaited<ReturnType<typeof listWorkspaceArticles>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceArticles>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListWorkspaceResources<TData = Awaited<ReturnType<typeof listWorkspaceResources>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceResources>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListWorkspaceArticlesQueryOptions(options)
+  const queryOptions = getListWorkspaceResourcesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -877,18 +877,18 @@ export function useListWorkspaceArticles<TData = Awaited<ReturnType<typeof listW
 
 
 
-export const getCreateWorkspaceArticleUrl = () => {
+export const getCreateWorkspaceResourceUrl = () => {
 
 
 
 
-  return `/api/workspace/articles`
+  return `/api/workspace/resources`
 }
 
 /**
- * @summary Create a tutor article draft
+ * @summary Create a tutor resource draft
  */
-export const createWorkspaceArticle = async (workspaceArticleInput: WorkspaceArticleInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceArticle> => {
+export const createWorkspaceResource = async (workspaceResourceInput: WorkspaceResourceInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceResource> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -904,12 +904,12 @@ export const createWorkspaceArticle = async (workspaceArticleInput: WorkspaceArt
     }
     return headers;
   };
-return customFetch<WorkspaceArticle>(getCreateWorkspaceArticleUrl(),
+return customFetch<WorkspaceResource>(getCreateWorkspaceResourceUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(workspaceArticleInput)
+    body: JSON.stringify(workspaceResourceInput)
   }
 );}
 
@@ -917,13 +917,13 @@ return customFetch<WorkspaceArticle>(getCreateWorkspaceArticleUrl(),
 
 
 
-export const getCreateWorkspaceArticleMutationKey = () => ['createWorkspaceArticle'] as const;
+export const getCreateWorkspaceResourceMutationKey = () => ['createWorkspaceResource'] as const;
 
-export const getCreateWorkspaceArticleMutationOptions = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceArticle>>, TError,CreateWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceArticle>>, TError,CreateWorkspaceArticleMutationVariables, TContext> => {
+export const getCreateWorkspaceResourceMutationOptions = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceResource>>, TError,CreateWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceResource>>, TError,CreateWorkspaceResourceMutationVariables, TContext> => {
 
-const mutationKey = getCreateWorkspaceArticleMutationKey();
+const mutationKey = getCreateWorkspaceResourceMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -933,10 +933,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWorkspaceArticle>>, CreateWorkspaceArticleMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWorkspaceResource>>, CreateWorkspaceResourceMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  createWorkspaceArticle(data,requestOptions)
+          return  createWorkspaceResource(data,requestOptions)
         }
 
 
@@ -946,38 +946,38 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CreateWorkspaceArticleMutationResult = NonNullable<Awaited<ReturnType<typeof createWorkspaceArticle>>>
-    export type CreateWorkspaceArticleMutationBody = BodyType<WorkspaceArticleInput>
-    export type CreateWorkspaceArticleMutationError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>
-    export type CreateWorkspaceArticleMutationVariables = {data: BodyType<WorkspaceArticleInput>}
+    export type CreateWorkspaceResourceMutationResult = NonNullable<Awaited<ReturnType<typeof createWorkspaceResource>>>
+    export type CreateWorkspaceResourceMutationBody = BodyType<WorkspaceResourceInput>
+    export type CreateWorkspaceResourceMutationError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>
+    export type CreateWorkspaceResourceMutationVariables = {data: BodyType<WorkspaceResourceInput>}
 
     /**
- * @summary Create a tutor article draft
+ * @summary Create a tutor resource draft
  */
-export const useCreateWorkspaceArticle = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceArticle>>, TError,CreateWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useCreateWorkspaceResource = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkspaceResource>>, TError,CreateWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof createWorkspaceArticle>>,
+        Awaited<ReturnType<typeof createWorkspaceResource>>,
         TError,
-        CreateWorkspaceArticleMutationVariables,
+        CreateWorkspaceResourceMutationVariables,
         TContext
       > => {
-      return useMutation(getCreateWorkspaceArticleMutationOptions(options), queryClient);
+      return useMutation(getCreateWorkspaceResourceMutationOptions(options), queryClient);
     }
 
-export const getUpdateWorkspaceArticleUrl = (id: number,) => {
+export const getUpdateWorkspaceResourceUrl = (id: number,) => {
 
 
 
 
-  return `/api/workspace/articles/${id}`
+  return `/api/workspace/resources/${id}`
 }
 
 /**
- * @summary Update an owned article
+ * @summary Update an owned resource
  */
-export const updateWorkspaceArticle = async (id: number,
-    workspaceArticleUpdate: WorkspaceArticleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceArticle> => {
+export const updateWorkspaceResource = async (id: number,
+    workspaceResourceUpdate: WorkspaceResourceUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceResource> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -993,12 +993,12 @@ export const updateWorkspaceArticle = async (id: number,
     }
     return headers;
   };
-return customFetch<WorkspaceArticle>(getUpdateWorkspaceArticleUrl(id),
+return customFetch<WorkspaceResource>(getUpdateWorkspaceResourceUrl(id),
   {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(workspaceArticleUpdate)
+    body: JSON.stringify(workspaceResourceUpdate)
   }
 );}
 
@@ -1006,13 +1006,13 @@ return customFetch<WorkspaceArticle>(getUpdateWorkspaceArticleUrl(id),
 
 
 
-export const getUpdateWorkspaceArticleMutationKey = () => ['updateWorkspaceArticle'] as const;
+export const getUpdateWorkspaceResourceMutationKey = () => ['updateWorkspaceResource'] as const;
 
-export const getUpdateWorkspaceArticleMutationOptions = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceArticle>>, TError,UpdateWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceArticle>>, TError,UpdateWorkspaceArticleMutationVariables, TContext> => {
+export const getUpdateWorkspaceResourceMutationOptions = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceResource>>, TError,UpdateWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceResource>>, TError,UpdateWorkspaceResourceMutationVariables, TContext> => {
 
-const mutationKey = getUpdateWorkspaceArticleMutationKey();
+const mutationKey = getUpdateWorkspaceResourceMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1022,10 +1022,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceArticle>>, UpdateWorkspaceArticleMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceResource>>, UpdateWorkspaceResourceMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateWorkspaceArticle(id,data,requestOptions)
+          return  updateWorkspaceResource(id,data,requestOptions)
         }
 
 
@@ -1035,39 +1035,39 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateWorkspaceArticleMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceArticle>>>
-    export type UpdateWorkspaceArticleMutationBody = BodyType<WorkspaceArticleUpdate>
-    export type UpdateWorkspaceArticleMutationError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
-    export type UpdateWorkspaceArticleMutationVariables = {id: number;data: BodyType<WorkspaceArticleUpdate>}
+    export type UpdateWorkspaceResourceMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceResource>>>
+    export type UpdateWorkspaceResourceMutationBody = BodyType<WorkspaceResourceUpdate>
+    export type UpdateWorkspaceResourceMutationError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type UpdateWorkspaceResourceMutationVariables = {id: number;data: BodyType<WorkspaceResourceUpdate>}
 
     /**
- * @summary Update an owned article
+ * @summary Update an owned resource
  */
-export const useUpdateWorkspaceArticle = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceArticle>>, TError,UpdateWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useUpdateWorkspaceResource = <TError = ErrorType<Error | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceResource>>, TError,UpdateWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof updateWorkspaceArticle>>,
+        Awaited<ReturnType<typeof updateWorkspaceResource>>,
         TError,
-        UpdateWorkspaceArticleMutationVariables,
+        UpdateWorkspaceResourceMutationVariables,
         TContext
       > => {
-      return useMutation(getUpdateWorkspaceArticleMutationOptions(options), queryClient);
+      return useMutation(getUpdateWorkspaceResourceMutationOptions(options), queryClient);
     }
 
-export const getDeleteWorkspaceArticleUrl = (id: number,) => {
+export const getDeleteWorkspaceResourceUrl = (id: number,) => {
 
 
 
 
-  return `/api/workspace/articles/${id}`
+  return `/api/workspace/resources/${id}`
 }
 
 /**
- * @summary Delete an owned article
+ * @summary Delete an owned resource
  */
-export const deleteWorkspaceArticle = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+export const deleteWorkspaceResource = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
-  return customFetch<void>(getDeleteWorkspaceArticleUrl(id),
+  return customFetch<void>(getDeleteWorkspaceResourceUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -1080,13 +1080,13 @@ export const deleteWorkspaceArticle = async (id: number, options?: Parameters<ty
 
 
 
-export const getDeleteWorkspaceArticleMutationKey = () => ['deleteWorkspaceArticle'] as const;
+export const getDeleteWorkspaceResourceMutationKey = () => ['deleteWorkspaceResource'] as const;
 
-export const getDeleteWorkspaceArticleMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceArticle>>, TError,DeleteWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceArticle>>, TError,DeleteWorkspaceArticleMutationVariables, TContext> => {
+export const getDeleteWorkspaceResourceMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceResource>>, TError,DeleteWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceResource>>, TError,DeleteWorkspaceResourceMutationVariables, TContext> => {
 
-const mutationKey = getDeleteWorkspaceArticleMutationKey();
+const mutationKey = getDeleteWorkspaceResourceMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1096,10 +1096,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWorkspaceArticle>>, DeleteWorkspaceArticleMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWorkspaceResource>>, DeleteWorkspaceResourceMutationVariables> = (props) => {
           const {id} = props ?? {};
 
-          return  deleteWorkspaceArticle(id,requestOptions)
+          return  deleteWorkspaceResource(id,requestOptions)
         }
 
 
@@ -1109,23 +1109,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteWorkspaceArticleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkspaceArticle>>>
+    export type DeleteWorkspaceResourceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkspaceResource>>>
 
-    export type DeleteWorkspaceArticleMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
-    export type DeleteWorkspaceArticleMutationVariables = {id: number}
+    export type DeleteWorkspaceResourceMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type DeleteWorkspaceResourceMutationVariables = {id: number}
 
     /**
- * @summary Delete an owned article
+ * @summary Delete an owned resource
  */
-export const useDeleteWorkspaceArticle = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceArticle>>, TError,DeleteWorkspaceArticleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useDeleteWorkspaceResource = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceResource>>, TError,DeleteWorkspaceResourceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteWorkspaceArticle>>,
+        Awaited<ReturnType<typeof deleteWorkspaceResource>>,
         TError,
-        DeleteWorkspaceArticleMutationVariables,
+        DeleteWorkspaceResourceMutationVariables,
         TContext
       > => {
-      return useMutation(getDeleteWorkspaceArticleMutationOptions(options), queryClient);
+      return useMutation(getDeleteWorkspaceResourceMutationOptions(options), queryClient);
     }
 
 export const getUpdateWorkspaceProfileUrl = () => {

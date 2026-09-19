@@ -8,7 +8,7 @@
 import type { ResourceSection } from './resourceSection';
 import type { ResourceType } from './resourceType';
 
-export interface WorkspaceArticleInput {
+export interface WorkspaceResourceInput {
   /** @minLength 3 */
   title: string;
   subject?: string;

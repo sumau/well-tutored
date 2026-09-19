@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useGetWorkspaceSession, useListWorkspaceArticles, useDeleteWorkspaceArticle, getListWorkspaceArticlesQueryKey } from "@workspace/api-client-react";
+import { useGetWorkspaceSession, useListWorkspaceResources, useDeleteWorkspaceResource, getListWorkspaceResourcesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -23,8 +23,8 @@ import { useClerk } from "@clerk/react";
 
 export default function WorkspaceDashboard() {
   const { data: session, isError: sessionError } = useGetWorkspaceSession();
-  const { data: articles, isLoading } = useListWorkspaceArticles();
-  const deleteArticle = useDeleteWorkspaceArticle();
+  const { data: resources, isLoading } = useListWorkspaceResources();
+  const deleteResource = useDeleteWorkspaceResource();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const { signOut } = useClerk();
@@ -35,15 +35,15 @@ export default function WorkspaceDashboard() {
     "there";
 
   const handleDelete = (id: number) => {
-    deleteArticle.mutate(
+    deleteResource.mutate(
       { id },
       {
         onSuccess: () => {
-          toast.success("Article deleted");
-          queryClient.invalidateQueries({ queryKey: getListWorkspaceArticlesQueryKey() });
+          toast.success("Resource deleted");
+          queryClient.invalidateQueries({ queryKey: getListWorkspaceResourcesQueryKey() });
         },
         onError: () => {
-          toast.error("Failed to delete article");
+          toast.error("Failed to delete resource");
         }
       }
     );
@@ -86,7 +86,7 @@ export default function WorkspaceDashboard() {
       </div>
 
       <div className="mb-8 flex items-center justify-between">
-        <h2 className="text-xl font-serif">Your Articles</h2>
+        <h2 className="text-xl font-serif">Your Resources</h2>
       </div>
 
       {isLoading ? (
@@ -103,35 +103,35 @@ export default function WorkspaceDashboard() {
             </Card>
           ))}
         </div>
-      ) : articles && articles.length > 0 ? (
+      ) : resources && resources.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => (
-            <Card key={article.id} className="rounded-none border-border shadow-none flex flex-col group">
+          {resources.map((resource) => (
+            <Card key={resource.id} className="rounded-none border-border shadow-none flex flex-col group">
               <CardHeader className="pb-3 flex-1">
                 <div className="flex justify-between items-start gap-4 mb-2">
-                  <Badge variant={article.status === "published" ? "default" : "secondary"} className="rounded-none font-normal text-[11px] px-2 py-0.5 tracking-wide">
-                    {article.status === "published" ? "Published" : "Draft"}
+                  <Badge variant={resource.status === "published" ? "default" : "secondary"} className="rounded-none font-normal text-[11px] px-2 py-0.5 tracking-wide">
+                    {resource.status === "published" ? "Published" : "Draft"}
                   </Badge>
-                  {article.status === "published" && article.publishedAt && (
+                  {resource.status === "published" && resource.publishedAt && (
                     <span className="text-[11px] text-muted-foreground">
-                      {format(new Date(article.publishedAt), "MMM d, yyyy")}
+                      {format(new Date(resource.publishedAt), "MMM d, yyyy")}
                     </span>
                   )}
                 </div>
-                <CardTitle className="text-lg font-serif line-clamp-2 leading-tight group-hover:text-primary transition-colors cursor-pointer" onClick={() => setLocation(`/workspace/articles/${article.id}`)}>
-                  {article.title}
+                <CardTitle className="text-lg font-serif line-clamp-2 leading-tight group-hover:text-primary transition-colors cursor-pointer" onClick={() => setLocation(`/workspace/resources/${resource.id}`)}>
+                  {resource.title}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {article.subject} • {article.level}
+                  {resource.subject} • {resource.level}
                 </CardDescription>
               </CardHeader>
               
               <CardContent className="text-sm text-muted-foreground line-clamp-3 pb-4">
-                {article.excerpt || "No excerpt written yet."}
+                {resource.excerpt || "No excerpt written yet."}
               </CardContent>
 
               <CardFooter className="pt-4 border-t border-border flex justify-between gap-2">
-                <Link href={`/workspace/articles/${article.id}`} className="flex-1">
+                <Link href={`/workspace/resources/${resource.id}`} className="flex-1">
                   <Button variant="ghost" size="sm" className="w-full gap-2 text-xs font-semibold justify-start text-muted-foreground hover:text-foreground">
                     <Edit size={14} /> Edit
                   </Button>
@@ -144,14 +144,14 @@ export default function WorkspaceDashboard() {
                   </AlertDialogTrigger>
                   <AlertDialogContent className="rounded-none border-border">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="font-serif">Delete Article</AlertDialogTitle>
+                      <AlertDialogTitle className="font-serif">Delete Resource</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete the article "{article.title}". This action cannot be undone.
+                        This will permanently delete the resource "{resource.title}". This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
-                      <AlertDialogAction className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(article.id)}>
+                      <AlertDialogAction className="rounded-none bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDelete(resource.id)}>
                         Delete
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -166,14 +166,14 @@ export default function WorkspaceDashboard() {
           <div className="w-12 h-12 bg-muted flex items-center justify-center rounded-full mb-4">
             <FileText className="text-muted-foreground w-6 h-6" />
           </div>
-          <h3 className="text-lg font-serif mb-2">No articles yet</h3>
+          <h3 className="text-lg font-serif mb-2">No resources yet</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm">
              {hasTutorProfile
                ? "You haven't written any resources yet. Create a draft to get started."
-               : "There are no articles in the workspace yet."}
+                : "There are no resources in the workspace yet."}
           </p>
           {hasTutorProfile && (
-            <Link href="/workspace/articles/new">
+            <Link href="/workspace/resources/new">
               <Button>Create First Draft</Button>
             </Link>
           )}

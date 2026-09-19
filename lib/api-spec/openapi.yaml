@@ -139,43 +139,43 @@ paths:
                 $ref: "#/components/schemas/WorkspaceSession"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /workspace/articles:
+  /workspace/resources:
     get:
-      operationId: listWorkspaceArticles
+      operationId: listWorkspaceResources
       tags: [workspace]
-      summary: List articles editable by the current account
+      summary: List resources editable by the current account
       responses:
         "200":
-          description: Editable articles
+          description: Editable resources
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/WorkspaceArticle"
+                  $ref: "#/components/schemas/WorkspaceResource"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
     post:
-      operationId: createWorkspaceArticle
+      operationId: createWorkspaceResource
       tags: [workspace]
-      summary: Create a tutor article draft
+      summary: Create a tutor resource draft
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/WorkspaceArticleInput"
+              $ref: "#/components/schemas/WorkspaceResourceInput"
       responses:
         "201":
-          description: Article draft created
+          description: Resource draft created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkspaceArticle"
+                $ref: "#/components/schemas/WorkspaceResource"
         "400":
-          description: Invalid article
+          description: Invalid resource
           content:
             application/json:
               schema:
@@ -184,11 +184,11 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
-  /workspace/articles/{id}:
+  /workspace/resources/{id}:
     patch:
-      operationId: updateWorkspaceArticle
+      operationId: updateWorkspaceResource
       tags: [workspace]
-      summary: Update an owned article
+      summary: Update an owned resource
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:
@@ -196,16 +196,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/WorkspaceArticleUpdate"
+              $ref: "#/components/schemas/WorkspaceResourceUpdate"
       responses:
         "200":
-          description: Article updated
+          description: Resource updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkspaceArticle"
+                $ref: "#/components/schemas/WorkspaceResource"
         "400":
-          description: Invalid article
+          description: Invalid resource
           content:
             application/json:
               schema:
@@ -217,14 +217,14 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
-      operationId: deleteWorkspaceArticle
+      operationId: deleteWorkspaceResource
       tags: [workspace]
-      summary: Delete an owned article
+      summary: Delete an owned resource
       parameters:
         - $ref: "#/components/parameters/Id"
       responses:
         "204":
-          description: Article deleted
+          description: Resource deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -623,7 +623,7 @@ components:
       properties:
         role: { type: string, enum: [owner, tutor, pending] }
         tutorId: { type: ["integer", "null"] }
-    WorkspaceArticle:
+    WorkspaceResource:
       type: object
       required: [id, slug, tutorId, tutorName, title, subject, level, type, readMinutes, excerpt, body, sections, publishedAt, tint, status]
       properties:
@@ -645,7 +645,7 @@ components:
         publishedAt: { type: string, format: date }
         tint: { type: string }
         status: { type: string, enum: [draft, published] }
-    WorkspaceArticleInput:
+    WorkspaceResourceInput:
       type: object
       required: [title]
       properties:
@@ -660,7 +660,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ResourceSection"
-    WorkspaceArticleUpdate:
+    WorkspaceResourceUpdate:
       type: object
       properties:
         title: { type: string, minLength: 3 }

@@ -7,9 +7,9 @@
  */
 import type { ResourceSection } from './resourceSection';
 import type { ResourceType } from './resourceType';
-import type { WorkspaceArticleStatus } from './workspaceArticleStatus';
+import type { WorkspaceResourceStatus } from './workspaceResourceStatus';
 
-export interface WorkspaceArticle {
+export interface WorkspaceResource {
   id: number;
   slug: string;
   tutorId: number;
@@ -24,5 +24,5 @@ export interface WorkspaceArticle {
   sections: ResourceSection[];
   publishedAt: Date;
   tint: string;
-  status: WorkspaceArticleStatus;
+  status: WorkspaceResourceStatus;
 }

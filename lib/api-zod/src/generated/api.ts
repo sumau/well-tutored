@@ -292,9 +292,9 @@ export const GetWorkspaceSessionResponse = zod.object({
 
 
 /**
- * @summary List articles editable by the current account
+ * @summary List resources editable by the current account
  */
-export const ListWorkspaceArticlesResponseItem = zod.object({
+export const ListWorkspaceResourcesResponseItem = zod.object({
   "id": zod.int(),
   "slug": zod.string(),
   "tutorId": zod.int(),
@@ -315,18 +315,18 @@ export const ListWorkspaceArticlesResponseItem = zod.object({
   "tint": zod.string(),
   "status": zod.enum(['draft', 'published'])
 })
-export const ListWorkspaceArticlesResponse = zod.array(ListWorkspaceArticlesResponseItem)
+export const ListWorkspaceResourcesResponse = zod.array(ListWorkspaceResourcesResponseItem)
 
 
 /**
- * @summary Create a tutor article draft
+ * @summary Create a tutor resource draft
  */
-export const createWorkspaceArticleBodyTitleMin = 3;
+export const createWorkspaceResourceBodyTitleMin = 3;
 
 
 
-export const CreateWorkspaceArticleBody = zod.object({
-  "title": zod.string().min(createWorkspaceArticleBodyTitleMin),
+export const CreateWorkspaceResourceBody = zod.object({
+  "title": zod.string().min(createWorkspaceResourceBodyTitleMin),
   "subject": zod.string().optional(),
   "level": zod.string().optional(),
   "type": zod.enum(['Study note', 'Guide', 'Essay', 'Revision notes']).optional(),
@@ -339,7 +339,7 @@ export const CreateWorkspaceArticleBody = zod.object({
 })).optional()
 })
 
-export const CreateWorkspaceArticleResponse = zod.object({
+export const CreateWorkspaceResourceResponse = zod.object({
   "id": zod.int(),
   "slug": zod.string(),
   "tutorId": zod.int(),
@@ -363,21 +363,21 @@ export const CreateWorkspaceArticleResponse = zod.object({
 
 
 /**
- * @summary Update an owned article
+ * @summary Update an owned resource
  */
 
 
 
-export const UpdateWorkspaceArticleParams = zod.object({
+export const UpdateWorkspaceResourceParams = zod.object({
   "id": zod.coerce.number().int().min(1)
 })
 
-export const updateWorkspaceArticleBodyTitleMin = 3;
+export const updateWorkspaceResourceBodyTitleMin = 3;
 
 
 
-export const UpdateWorkspaceArticleBody = zod.object({
-  "title": zod.string().min(updateWorkspaceArticleBodyTitleMin).optional(),
+export const UpdateWorkspaceResourceBody = zod.object({
+  "title": zod.string().min(updateWorkspaceResourceBodyTitleMin).optional(),
   "subject": zod.string().optional(),
   "level": zod.string().optional(),
   "type": zod.enum(['Study note', 'Guide', 'Essay', 'Revision notes']).optional(),
@@ -391,7 +391,7 @@ export const UpdateWorkspaceArticleBody = zod.object({
   "status": zod.enum(['draft', 'published']).optional()
 })
 
-export const UpdateWorkspaceArticleResponse = zod.object({
+export const UpdateWorkspaceResourceResponse = zod.object({
   "id": zod.int(),
   "slug": zod.string(),
   "tutorId": zod.int(),
@@ -415,16 +415,16 @@ export const UpdateWorkspaceArticleResponse = zod.object({
 
 
 /**
- * @summary Delete an owned article
+ * @summary Delete an owned resource
  */
 
 
 
-export const DeleteWorkspaceArticleParams = zod.object({
+export const DeleteWorkspaceResourceParams = zod.object({
   "id": zod.coerce.number().int().min(1)
 })
 
-export const DeleteWorkspaceArticleResponse = zod.void()
+export const DeleteWorkspaceResourceResponse = zod.void()
 
 
 /**

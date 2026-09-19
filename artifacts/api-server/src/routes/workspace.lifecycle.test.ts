@@ -609,38 +609,38 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   assert(republishedTutor);
   assert.equal(republishedTutor.firstName, "Drafted");
 
-  const article = await request(
-    "/api/workspace/articles",
+  const resource = await request(
+    "/api/workspace/resources",
     {
       method: "POST",
       body: JSON.stringify({
-        title: "Lifecycle article",
+         title: "Lifecycle resource",
         subject: "History",
         level: "GCSE",
         type: "Guide",
         readMinutes: 5,
-        excerpt: "A short article created to verify the tutor delete cascade.",
-        body: "This article exists only to confirm that tutor deletion removes related content.",
+         excerpt: "A short resource created to verify the tutor delete cascade.",
+         body: "This resource exists only to confirm that tutor deletion removes related content.",
         sections: [],
         tint: "#C7D5C5",
       }),
     },
     pendingUserId,
   );
-  assert.equal(article.response.status, 201);
-  assert.equal(article.body.readMinutes, 1);
-  assert.equal(article.body.tint, pendingSession.body.tutor.tint);
-  const articleId = article.body.id as number;
+  assert.equal(resource.response.status, 201);
+  assert.equal(resource.body.readMinutes, 1);
+  assert.equal(resource.body.tint, pendingSession.body.tutor.tint);
+  const resourceId = resource.body.id as number;
 
-  const publishedArticle = await request(
-    `/api/workspace/articles/${articleId}`,
+  const publishedResource = await request(
+    `/api/workspace/resources/${resourceId}`,
     {
       method: "PATCH",
       body: JSON.stringify({ status: "published" }),
     },
     pendingUserId,
   );
-  assert.equal(publishedArticle.response.status, 200);
+  assert.equal(publishedResource.response.status, 200);
 
   const savedProfile = await request(
     "/api/workspace/profile",
@@ -692,11 +692,11 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     .where(eq(workspaceAccountsTable.clerkUserId, pendingUserId));
   assert.deepEqual(accountAfterDelete, [{ role: "tutor", tutorId: null }]);
 
-  const articleAfterDelete = await db
+  const resourceAfterDelete = await db
     .select({ id: resourcesTable.id })
     .from(resourcesTable)
-    .where(eq(resourcesTable.id, articleId));
-  assert.deepEqual(articleAfterDelete, []);
+    .where(eq(resourcesTable.id, resourceId));
+  assert.deepEqual(resourceAfterDelete, []);
 
   const pendingSessionAfterDelete = await request(
     "/api/workspace/me",

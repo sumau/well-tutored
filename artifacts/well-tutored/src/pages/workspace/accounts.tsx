@@ -3,7 +3,7 @@ import {
   getGetWorkspaceSessionQueryKey,
   getListWorkspaceAccountsQueryKey,
   getListWorkspaceTutorsQueryKey,
-  getListWorkspaceArticlesQueryKey,
+  getListWorkspaceResourcesQueryKey,
   useListWorkspaceAccounts,
   useDeleteWorkspaceAccount,
   useUpdateWorkspaceAccount,
@@ -37,7 +37,7 @@ export default function WorkspaceAccounts() {
     queryClient.invalidateQueries({ queryKey: getListWorkspaceAccountsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListWorkspaceTutorsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetWorkspaceSessionQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getListWorkspaceArticlesQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListWorkspaceResourcesQueryKey() });
   };
 
   const handleRoleChange = (id: number, role: "tutor" | "pending") => {
@@ -211,7 +211,7 @@ export default function WorkspaceAccounts() {
                               </AlertDialogTitle>
                               <AlertDialogDescription>
                                 This removes the Workspace sign-in record but does
-                                not delete the tutor profile or any articles. If
+                                not delete the tutor profile or any resources. If
                                 this person signs in again with a verified email,
                                 they can create a new pending account.
                               </AlertDialogDescription>

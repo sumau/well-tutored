@@ -8,17 +8,17 @@ import { useToast } from "@/hooks/use-toast";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { ResourceTypeLabel } from "@/components/ResourceType";
 
-export default function ResourceArticle() {
+export default function ResourceDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
   const [saved, setSaved] = useState(false);
   
-  const { data: article, isLoading, error, refetch } = useGetResource(slug as string, {
+  const { data: resource, isLoading, error, refetch } = useGetResource(slug as string, {
     query: { enabled: !!slug, queryKey: getGetResourceQueryKey(slug as string) }
   });
 
-  const { data: allResources } = useListResources({ subject: article?.subject }, {
-    query: { enabled: !!article, queryKey: getListResourcesQueryKey({ subject: article?.subject }) }
+  const { data: allResources } = useListResources({ subject: resource?.subject }, {
+    query: { enabled: !!resource, queryKey: getListResourcesQueryKey({ subject: resource?.subject }) }
   });
 
   const related = allResources?.filter(r => r.slug !== slug).slice(0, 3) || [];
@@ -28,7 +28,7 @@ export default function ResourceArticle() {
       await navigator.clipboard.writeText(window.location.href);
       toast({
         title: "Link copied",
-        description: "Article link copied to clipboard.",
+        description: "Resource link copied to clipboard.",
       });
     } catch (e) {
       // Fallback
@@ -39,7 +39,7 @@ export default function ResourceArticle() {
     setSaved(!saved);
     toast({
       title: saved ? "Removed from saved" : "Saved to notes",
-      description: saved ? "Article removed from your saved list." : "Article saved for later reading.",
+      description: saved ? "Resource removed from your saved list." : "Resource saved for later reading.",
     });
   };
 
@@ -47,11 +47,11 @@ export default function ResourceArticle() {
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  if (isLoading) return <LoadingState message="Loading article..." />;
-  if (error || !article) return <ErrorState message="Could not find this article." onRetry={refetch} />;
+  if (isLoading) return <LoadingState message="Loading resource..." />;
+  if (error || !resource) return <ErrorState message="Could not find this resource." onRetry={refetch} />;
 
   return (
-    <main className="flex-1" data-testid={`page-article-${article.slug}`}>
+    <main className="flex-1" data-testid={`page-resource-${resource.slug}`}>
       <article className="max-w-[1150px] mx-auto px-6 md:px-[28px] pt-[42px] md:pt-[62px] pb-[80px] md:pb-[100px]">
         {/* Breadcrumb */}
         <div className="text-[11px] text-muted-foreground flex items-center gap-[7px] mb-[30px] md:mb-[45px] font-medium">
@@ -59,20 +59,20 @@ export default function ResourceArticle() {
           <span>/</span>
           <Link href="/resources" className="hover:text-primary transition-colors">Resources</Link>
           <span>/</span>
-          <span className="text-foreground">{article.subject}</span>
+          <span className="text-foreground">{resource.subject}</span>
         </div>
 
         {/* Hero */}
         <header className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_285px] gap-[40px] md:gap-[75px] items-end pb-[40px] md:pb-[58px] border-b border-border">
           <div>
             <h1 className="font-serif text-[clamp(48px,7vw,88px)] leading-[0.92] tracking-tight mb-[24px] max-w-[850px] text-foreground">
-              {article.title}
+              {resource.title}
             </h1>
             <p className="text-[16px] leading-[1.65] text-muted-foreground max-w-[670px] m-0">
-              {article.excerpt}
+              {resource.excerpt}
             </p>
             <ResourceTypeLabel
-              type={article.type}
+              type={resource.type}
               size={15}
               className="mt-6 text-[10px] uppercase tracking-[0.14em] text-primary font-bold"
             />
@@ -80,13 +80,13 @@ export default function ResourceArticle() {
           
           <div className="md:border-l border-border md:pl-[24px] pt-[20px] md:pt-0 border-t md:border-t-0 mt-[20px] md:mt-0 text-muted-foreground text-[12px] leading-[1.7]">
             <div className="flex items-center gap-[12px] mb-[22px] text-foreground font-bold">
-              <span className="w-[43px] h-[43px] rounded-full grid place-items-center font-serif text-[18px] pb-1" style={{ backgroundColor: article.tutorTint }}>
-                {article.tutorName.split(' ').map(n => n[0]).join('')}
+              <span className="w-[43px] h-[43px] rounded-full grid place-items-center font-serif text-[18px] pb-1" style={{ backgroundColor: resource.tutorTint }}>
+                {resource.tutorName.split(' ').map(n => n[0]).join('')}
               </span>
-              <span>Written by {article.tutorName}</span>
+              <span>Written by {resource.tutorName}</span>
             </div>
-            <div className="flex gap-[7px] items-center mb-1"><Clock3 size={14} /> {article.readMinutes} min read</div>
-            <div className="flex gap-[7px] items-center mb-1"><span className="font-semibold">For</span> {article.level}</div>
+            <div className="flex gap-[7px] items-center mb-1"><Clock3 size={14} /> {resource.readMinutes} min read</div>
+            <div className="flex gap-[7px] items-center mb-1"><span className="font-semibold">For</span> {resource.level}</div>
             
             <div className="flex gap-[9px] items-center flex-wrap my-[25px]">
               <button 
@@ -117,11 +117,11 @@ export default function ResourceArticle() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-[60px] lg:gap-[82px] pt-[45px] lg:pt-[65px] lg:pl-[60px] lg:pr-[40px]">
           
           <div className="max-w-[660px] text-[16px] leading-[1.8] text-foreground">
-            {article.sections.length > 0 && (
+            {resource.sections.length > 0 && (
               <nav className="bg-card p-[22px] mb-[40px] border-l-4 border-primary shadow-sm" aria-label="In this guide">
                 <h3 className="font-serif text-[21px] mb-[12px] flex items-center gap-2"><List size={15} className="text-primary"/> In this guide</h3>
                 <div className="flex flex-col gap-2.5">
-                  {article.sections.map((section, idx) => (
+                  {resource.sections.map((section, idx) => (
                     <button 
                       key={section.id} 
                       onClick={() => jumpTo(section.id)} 
@@ -135,10 +135,10 @@ export default function ResourceArticle() {
             )}
 
             <p className="mb-[25px] leading-[1.8] text-foreground">
-              {article.body}
+              {resource.body}
             </p>
 
-            {article.sections.map(section => (
+            {resource.sections.map(section => (
               <div key={section.id} id={`section-${section.id}`} className="mt-[48px] scroll-mt-24">
                 <h2 className="font-serif text-[32px] md:text-[36px] leading-[1.1] tracking-tight mb-[20px] text-foreground">
                   {section.heading}
@@ -151,23 +151,23 @@ export default function ResourceArticle() {
 
             <div className="flex gap-[12px] flex-wrap mt-[60px] pt-[30px] border-t border-border">
               <Link 
-                href={`/tutors/${article.tutorSlug}`}
+                href={`/tutors/${resource.tutorSlug}`}
                 className="bg-foreground text-background px-[16px] py-[14px] inline-flex items-center gap-[8px] text-[13px] font-bold hover:bg-primary transition-colors"
               >
-                View {article.tutorName.split(' ')[0]}'s profile <ArrowRight size={15} />
+                View {resource.tutorName.split(' ')[0]}'s profile <ArrowRight size={15} />
               </Link>
             </div>
           </div>
           
           <aside className="lg:self-start flex flex-col gap-[18px]">
-            <div className="p-[25px]" style={{ backgroundColor: article.tutorTint }}>
+            <div className="p-[25px]" style={{ backgroundColor: resource.tutorTint }}>
               <span className="block text-[10px] font-bold tracking-[0.15em] uppercase text-primary mb-2">Meet the author</span>
-              <h3 className="font-serif text-[26px] leading-[1.05] tracking-tight mb-[12px]">{article.tutorName}</h3>
+              <h3 className="font-serif text-[26px] leading-[1.05] tracking-tight mb-[12px]">{resource.tutorName}</h3>
               <p className="text-[13px] leading-[1.6] text-foreground/80 mb-[22px]">
-                Connect with {article.tutorName.split(' ')[0]} to discuss tailored support for {article.subject}.
+                Connect with {resource.tutorName.split(' ')[0]} to discuss tailored support for {resource.subject}.
               </p>
               <Link 
-                href={`/tutors/${article.tutorSlug}`}
+                href={`/tutors/${resource.tutorSlug}`}
                 className="bg-foreground text-background px-[15px] py-[13px] inline-flex items-center gap-[8px] text-[12px] font-bold hover:bg-primary transition-colors w-full justify-center"
               >
                 View full profile <ArrowRight size={14} />
@@ -222,9 +222,9 @@ export default function ResourceArticle() {
           </p>
           <div className="bg-background text-foreground text-left max-w-[600px] mx-auto shadow-2xl rounded-sm">
              <EnquiryForm compact={true} tutors={[{
-               slug: article.tutorSlug,
-               name: article.tutorName,
-               subject: article.subject
+               slug: resource.tutorSlug,
+               name: resource.tutorName,
+               subject: resource.subject
              } as any]} />
           </div>
         </div>

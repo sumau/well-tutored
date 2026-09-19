@@ -2,25 +2,25 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
 import { and, asc, count, eq, ilike, ne } from "drizzle-orm";
 import {
-  CreateWorkspaceArticleBody,
-  CreateWorkspaceArticleResponse,
+  CreateWorkspaceResourceBody,
+  CreateWorkspaceResourceResponse,
   CreateWorkspaceTutorBody,
   CreateWorkspaceTutorResponse,
   ArchiveWorkspaceTutorParams,
   ArchiveWorkspaceTutorResponse,
-  DeleteWorkspaceArticleParams,
+  DeleteWorkspaceResourceParams,
   DeleteWorkspaceTutorParams,
   DiscardWorkspaceProfileDraftResponse,
   GetWorkspaceSessionResponse,
   ListWorkspaceAccountsResponse,
-  ListWorkspaceArticlesResponse,
+  ListWorkspaceResourcesResponse,
   ListWorkspaceTutorsResponse,
   UpdateWorkspaceAccountBody,
   UpdateWorkspaceAccountParams,
   UpdateWorkspaceAccountResponse,
-  UpdateWorkspaceArticleBody,
-  UpdateWorkspaceArticleParams,
-  UpdateWorkspaceArticleResponse,
+  UpdateWorkspaceResourceBody,
+  UpdateWorkspaceResourceParams,
+  UpdateWorkspaceResourceResponse,
   UpdateWorkspaceProfileBody,
   UpdateWorkspaceProfileResponse,
   RestoreWorkspaceTutorParams,
@@ -45,7 +45,7 @@ import { normalizeResourceType } from "../lib/resource-types";
 const router: IRouter = Router();
 type Account = typeof workspaceAccountsTable.$inferSelect;
 
-function isPublishableArticle(article: {
+function isPublishableResource(resource: {
   title: string;
   subject: string;
   level: string;
@@ -55,13 +55,13 @@ function isPublishableArticle(article: {
   sections: Array<{ id: string; heading: string; body: string }>;
 }) {
   return (
-    article.title.trim().length >= 3 &&
-    article.subject.trim().length >= 1 &&
-    article.level.trim().length >= 1 &&
-    ["Study note", "Guide", "Essay", "Revision notes"].includes(article.type) &&
-    article.excerpt.trim().length >= 10 &&
-    article.body.trim().length >= 20 &&
-    article.sections.every(
+    resource.title.trim().length >= 3 &&
+    resource.subject.trim().length >= 1 &&
+    resource.level.trim().length >= 1 &&
+    ["Study note", "Guide", "Essay", "Revision notes"].includes(resource.type) &&
+    resource.excerpt.trim().length >= 10 &&
+    resource.body.trim().length >= 20 &&
+    resource.sections.every(
       (section) =>
         section.id.trim().length >= 1 &&
         section.heading.trim().length >= 2 &&
@@ -214,7 +214,7 @@ function requireOwner(account: Account, res: Response): boolean {
   return true;
 }
 
-function articleResponse(
+function resourceResponse(
   resource: typeof resourcesTable.$inferSelect,
   tutor: Pick<typeof tutorsTable.$inferSelect, "name" | "tint">,
 ) {
@@ -237,7 +237,7 @@ function articleResponse(
   };
 }
 
-async function joinedArticle(id: number) {
+async function joinedResource(id: number) {
   const [row] = await db
     .select({
       resource: resourcesTable,
@@ -265,7 +265,7 @@ function slugify(title: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
-  return `${base || "article"}-${Date.now().toString(36).slice(-6)}`;
+  return `${base || "resource"}-${Date.now().toString(36).slice(-6)}`;
 }
 
 function tutorInitials(name: string) {
@@ -468,7 +468,7 @@ router.get("/workspace/me", async (req, res): Promise<void> => {
   );
 });
 
-router.get("/workspace/articles", async (req, res): Promise<void> => {
+router.get(["/workspace/resources", "/workspace/articles"], async (req, res): Promise<void> => {
   const account = await workspaceAccount(req, res);
   if (!account || !requireApproved(account, res)) return;
 
@@ -485,22 +485,22 @@ router.get("/workspace/articles", async (req, res): Promise<void> => {
     .where(account.tutorId ? eq(resourcesTable.tutorId, account.tutorId) : undefined)
     .orderBy(asc(resourcesTable.id));
   res.json(
-    ListWorkspaceArticlesResponse.parse(
-      rows.map((row) => articleResponse(row.resource, row.tutor)),
+    ListWorkspaceResourcesResponse.parse(
+      rows.map((row) => resourceResponse(row.resource, row.tutor)),
     ),
   );
 });
 
-router.post("/workspace/articles", async (req, res): Promise<void> => {
+router.post(["/workspace/resources", "/workspace/articles"], async (req, res): Promise<void> => {
   const account = await workspaceAccount(req, res);
   if (!account || !requireApproved(account, res)) return;
   if (!account.tutorId) {
     res.status(403).json({ error: "A tutor profile must be assigned first." });
     return;
   }
-  const body = CreateWorkspaceArticleBody.safeParse(req.body);
+  const body = CreateWorkspaceResourceBody.safeParse(req.body);
   if (!body.success) {
-    res.status(400).json({ error: "Please check the article fields." });
+    res.status(400).json({ error: "Please check the resource fields." });
     return;
   }
   const [tutor] = await db
@@ -532,29 +532,29 @@ router.post("/workspace/articles", async (req, res): Promise<void> => {
     .returning();
   res
     .status(201)
-    .json(CreateWorkspaceArticleResponse.parse(articleResponse(resource, tutor)));
+    .json(CreateWorkspaceResourceResponse.parse(resourceResponse(resource, tutor)));
 });
 
-router.patch("/workspace/articles/:id", async (req, res): Promise<void> => {
+router.patch(["/workspace/resources/:id", "/workspace/articles/:id"], async (req, res): Promise<void> => {
   const account = await workspaceAccount(req, res);
   if (!account || !requireApproved(account, res)) return;
-  const params = UpdateWorkspaceArticleParams.safeParse(req.params);
-  const body = UpdateWorkspaceArticleBody.safeParse(req.body);
+  const params = UpdateWorkspaceResourceParams.safeParse(req.params);
+  const body = UpdateWorkspaceResourceBody.safeParse(req.body);
   if (!params.success || !body.success) {
-    res.status(400).json({ error: "Please check the article fields." });
+    res.status(400).json({ error: "Please check the resource fields." });
     return;
   }
-  const current = await joinedArticle(params.data.id);
+  const current = await joinedResource(params.data.id);
   if (!current) {
-    res.status(404).json({ error: "Article not found" });
+    res.status(404).json({ error: "Resource not found" });
     return;
   }
   if (!canEdit(account, current.resource.tutorId)) {
-    res.status(403).json({ error: "You cannot edit this article." });
+    res.status(403).json({ error: "You cannot edit this resource." });
     return;
   }
   if (body.data.status === "published") {
-    const publishableArticle = {
+    const publishableResource = {
       title: body.data.title ?? current.resource.title,
       subject: body.data.subject ?? current.resource.subject,
       level: body.data.level ?? current.resource.level,
@@ -563,9 +563,9 @@ router.patch("/workspace/articles/:id", async (req, res): Promise<void> => {
       body: body.data.body ?? current.resource.body,
       sections: body.data.sections ?? current.resource.sections,
     };
-    if (!isPublishableArticle(publishableArticle)) {
+    if (!isPublishableResource(publishableResource)) {
       res.status(400).json({
-        error: "Complete the article before publishing it.",
+        error: "Complete the resource before publishing it.",
       });
       return;
     }
@@ -585,27 +585,27 @@ router.patch("/workspace/articles/:id", async (req, res): Promise<void> => {
     .where(eq(resourcesTable.id, params.data.id))
     .returning();
   res.json(
-    UpdateWorkspaceArticleResponse.parse(
-      articleResponse(updated, current.tutor),
+      UpdateWorkspaceResourceResponse.parse(
+        resourceResponse(updated, current.tutor),
     ),
   );
 });
 
-router.delete("/workspace/articles/:id", async (req, res): Promise<void> => {
+router.delete(["/workspace/resources/:id", "/workspace/articles/:id"], async (req, res): Promise<void> => {
   const account = await workspaceAccount(req, res);
   if (!account || !requireApproved(account, res)) return;
-  const params = DeleteWorkspaceArticleParams.safeParse(req.params);
+  const params = DeleteWorkspaceResourceParams.safeParse(req.params);
   if (!params.success) {
-    res.status(400).json({ error: "Invalid article." });
+    res.status(400).json({ error: "Invalid resource." });
     return;
   }
-  const current = await joinedArticle(params.data.id);
+  const current = await joinedResource(params.data.id);
   if (!current) {
-    res.status(404).json({ error: "Article not found" });
+    res.status(404).json({ error: "Resource not found" });
     return;
   }
   if (!canEdit(account, current.resource.tutorId)) {
-    res.status(403).json({ error: "You cannot delete this article." });
+    res.status(403).json({ error: "You cannot delete this resource." });
     return;
   }
   await db.delete(resourcesTable).where(eq(resourcesTable.id, params.data.id));

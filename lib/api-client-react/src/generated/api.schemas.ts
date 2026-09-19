@@ -215,15 +215,15 @@ export interface WorkspaceAccountUpdate {
   tutorId?: number | null;
 }
 
-export type WorkspaceArticleStatus = typeof WorkspaceArticleStatus[keyof typeof WorkspaceArticleStatus];
+export type WorkspaceResourceStatus = typeof WorkspaceResourceStatus[keyof typeof WorkspaceResourceStatus];
 
 
-export const WorkspaceArticleStatus = {
+export const WorkspaceResourceStatus = {
   draft: 'draft',
   published: 'published',
 } as const;
 
-export interface WorkspaceArticle {
+export interface WorkspaceResource {
   id: number;
   slug: string;
   tutorId: number;
@@ -238,10 +238,10 @@ export interface WorkspaceArticle {
   sections: ResourceSection[];
   publishedAt: string;
   tint: string;
-  status: WorkspaceArticleStatus;
+  status: WorkspaceResourceStatus;
 }
 
-export interface WorkspaceArticleInput {
+export interface WorkspaceResourceInput {
   /** @minLength 3 */
   title: string;
   subject?: string;
@@ -252,15 +252,15 @@ export interface WorkspaceArticleInput {
   sections?: ResourceSection[];
 }
 
-export type WorkspaceArticleUpdateStatus = typeof WorkspaceArticleUpdateStatus[keyof typeof WorkspaceArticleUpdateStatus];
+export type WorkspaceResourceUpdateStatus = typeof WorkspaceResourceUpdateStatus[keyof typeof WorkspaceResourceUpdateStatus];
 
 
-export const WorkspaceArticleUpdateStatus = {
+export const WorkspaceResourceUpdateStatus = {
   draft: 'draft',
   published: 'published',
 } as const;
 
-export interface WorkspaceArticleUpdate {
+export interface WorkspaceResourceUpdate {
   /** @minLength 3 */
   title?: string;
   subject?: string;
@@ -269,7 +269,7 @@ export interface WorkspaceArticleUpdate {
   excerpt?: string;
   body?: string;
   sections?: ResourceSection[];
-  status?: WorkspaceArticleUpdateStatus;
+  status?: WorkspaceResourceUpdateStatus;
 }
 
 export type TutorProfileUpdateAvailability = typeof TutorProfileUpdateAvailability[keyof typeof TutorProfileUpdateAvailability];

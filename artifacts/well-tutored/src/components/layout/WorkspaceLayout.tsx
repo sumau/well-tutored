@@ -17,7 +17,7 @@ export function WorkspaceLayout({ children }: { children: ReactNode }) {
   const navigation = [
     { href: "/workspace", label: "Overview", icon: LayoutDashboard },
     { href: "/workspace/profile", label: "Tutor profile", icon: UserRound },
-    { href: "/workspace/articles/new", label: "Write", icon: FileText },
+    { href: "/workspace/resources/new", label: "Write resource", icon: FileText },
     ...(session?.role === "owner"
       ? [
           { href: "/workspace/tutors", label: "Tutor profiles", icon: UserRound },

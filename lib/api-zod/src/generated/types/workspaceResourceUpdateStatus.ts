@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type WorkspaceArticleUpdateStatus = typeof WorkspaceArticleUpdateStatus[keyof typeof WorkspaceArticleUpdateStatus];
+export type WorkspaceResourceUpdateStatus = typeof WorkspaceResourceUpdateStatus[keyof typeof WorkspaceResourceUpdateStatus];
 
 
-export const WorkspaceArticleUpdateStatus = {
+export const WorkspaceResourceUpdateStatus = {
   draft: 'draft',
   published: 'published',
 } as const;

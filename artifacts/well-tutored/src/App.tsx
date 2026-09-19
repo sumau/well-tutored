@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { Route, Switch, Router as WouterRouter, useLocation, Redirect } from 'wouter';
+import { Route, Switch, Router as WouterRouter, useLocation, useParams, Redirect } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -15,7 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Home from '@/pages/Home';
 import TutorProfile from '@/pages/TutorProfile';
 import Resources from '@/pages/Resources';
-import ResourceArticle from '@/pages/ResourceArticle';
+import ResourceDetail from '@/pages/ResourceDetail';
 import Enquiry from '@/pages/Enquiry';
 import NotFound from '@/pages/not-found';
 import SignInPage from '@/pages/auth/sign-in';
@@ -23,7 +23,7 @@ import SignUpPage from '@/pages/auth/sign-up';
 import WorkspaceDashboard from '@/pages/workspace/dashboard';
 import WorkspaceAccounts from '@/pages/workspace/accounts';
 import WorkspaceTutorProfiles from '@/pages/workspace/tutor-profiles';
-import WorkspaceArticleEditor from '@/pages/workspace/article-editor';
+import WorkspaceResourceEditor from '@/pages/workspace/resource-editor';
 import WorkspaceProfile from '@/pages/workspace/profile';
 
 const queryClient = new QueryClient({
@@ -82,6 +82,11 @@ function RouteMeta() {
 }
 
 function WorkspaceRoutes() {
+  function LegacyWorkspaceResourceRedirect() {
+    const params = useParams<{ id?: string }>();
+    return <Redirect to={params.id ? `/workspace/resources/${params.id}` : "/workspace/resources/new"} />;
+  }
+
   return (
     <>
       <Show when="signed-in">
@@ -92,8 +97,10 @@ function WorkspaceRoutes() {
               <Route path="/workspace/accounts" component={WorkspaceAccounts} />
               <Route path="/workspace/tutors" component={WorkspaceTutorProfiles} />
               <Route path="/workspace/profile" component={WorkspaceProfile} />
-              <Route path="/workspace/articles/new" component={WorkspaceArticleEditor} />
-              <Route path="/workspace/articles/:id" component={WorkspaceArticleEditor} />
+              <Route path="/workspace/resources/new" component={WorkspaceResourceEditor} />
+              <Route path="/workspace/resources/:id" component={WorkspaceResourceEditor} />
+              <Route path="/workspace/articles/new" component={LegacyWorkspaceResourceRedirect} />
+              <Route path="/workspace/articles/:id" component={LegacyWorkspaceResourceRedirect} />
               <Route component={NotFound} />
             </Switch>
           </WorkspaceAuthBoundary>
@@ -118,7 +125,7 @@ function Router() {
               <Route path="/" component={Home} />
               <Route path="/tutors/:slug" component={TutorProfile} />
               <Route path="/resources" component={Resources} />
-              <Route path="/resources/:slug" component={ResourceArticle} />
+              <Route path="/resources/:slug" component={ResourceDetail} />
               <Route path="/enquire" component={Enquiry} />
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />

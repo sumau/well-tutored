@@ -7,9 +7,9 @@
  */
 import type { ResourceSection } from './resourceSection';
 import type { ResourceType } from './resourceType';
-import type { WorkspaceArticleUpdateStatus } from './workspaceArticleUpdateStatus';
+import type { WorkspaceResourceUpdateStatus } from './workspaceResourceUpdateStatus';
 
-export interface WorkspaceArticleUpdate {
+export interface WorkspaceResourceUpdate {
   /** @minLength 3 */
   title?: string;
   subject?: string;
@@ -18,5 +18,5 @@ export interface WorkspaceArticleUpdate {
   excerpt?: string;
   body?: string;
   sections?: ResourceSection[];
-  status?: WorkspaceArticleUpdateStatus;
+  status?: WorkspaceResourceUpdateStatus;
 }

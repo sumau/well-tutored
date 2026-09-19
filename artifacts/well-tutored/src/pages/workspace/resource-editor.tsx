@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
-import { useListWorkspaceArticles, useCreateWorkspaceArticle, useUpdateWorkspaceArticle, getListWorkspaceArticlesQueryKey, WorkspaceArticleStatus } from "@workspace/api-client-react";
+import { useListWorkspaceResources, useCreateWorkspaceResource, useUpdateWorkspaceResource, getListWorkspaceResourcesQueryKey, WorkspaceResourceStatus } from "@workspace/api-client-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -19,7 +19,7 @@ const sectionSchema = z.object({
   body: z.string().min(10, "Body content required"),
 });
 
-const articleSchema = z.object({
+const resourceSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   subject: z.string().min(1, "Subject is required"),
   level: z.string().min(1, "Level is required"),
@@ -27,34 +27,34 @@ const articleSchema = z.object({
   excerpt: z.string().min(10, "Excerpt is too short"),
   body: z.string().min(20, "Introduction must be at least 20 characters"),
   sections: z.array(sectionSchema),
-  status: z.enum([WorkspaceArticleStatus.draft, WorkspaceArticleStatus.published]).optional(),
+  status: z.enum([WorkspaceResourceStatus.draft, WorkspaceResourceStatus.published]).optional(),
 });
-const draftSchema = articleSchema.pick({ title: true });
-type ArticleFormValues = z.infer<typeof articleSchema>;
-type ArticleDraftValues = Partial<ArticleFormValues> & Pick<ArticleFormValues, "title">;
+const draftSchema = resourceSchema.pick({ title: true });
+type ResourceFormValues = z.infer<typeof resourceSchema>;
+type ResourceDraftValues = Partial<ResourceFormValues> & Pick<ResourceFormValues, "title">;
 
-export default function WorkspaceArticleEditor() {
+export default function WorkspaceResourceEditor() {
   const [, setLocation] = useLocation();
   const params = useParams();
   const isNew = !params.id || params.id === "new";
-  const articleId = !isNew ? parseInt(params.id!, 10) : null;
+  const resourceId = !isNew ? parseInt(params.id!, 10) : null;
 
-  const { data: articles, isLoading: isLoadingArticles } = useListWorkspaceArticles({
-    query: { enabled: !isNew, queryKey: getListWorkspaceArticlesQueryKey() }
+  const { data: resources, isLoading: isLoadingResources } = useListWorkspaceResources({
+    query: { enabled: !isNew, queryKey: getListWorkspaceResourcesQueryKey() }
   });
   
-  const article = articles?.find(a => a.id === articleId);
+  const resource = resources?.find(item => item.id === resourceId);
 
-  const createArticle = useCreateWorkspaceArticle();
-  const updateArticle = useUpdateWorkspaceArticle();
+  const createResource = useCreateWorkspaceResource();
+  const updateResource = useUpdateWorkspaceResource();
   const queryClient = useQueryClient();
   const [saveFeedback, setSaveFeedback] = useState<"saved" | "error" | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
   const [publishValidationMessage, setPublishValidationMessage] = useState<string | null>(null);
   const saveFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const form = useForm<z.infer<typeof articleSchema>>({
-    resolver: zodResolver(articleSchema),
+  const form = useForm<z.infer<typeof resourceSchema>>({
+    resolver: zodResolver(resourceSchema),
     defaultValues: {
       title: "",
       subject: "",
@@ -63,7 +63,7 @@ export default function WorkspaceArticleEditor() {
       excerpt: "",
       body: "",
       sections: [],
-      status: WorkspaceArticleStatus.draft
+      status: WorkspaceResourceStatus.draft
     }
   });
 
@@ -101,66 +101,66 @@ export default function WorkspaceArticleEditor() {
   };
 
   useEffect(() => {
-    if (!isNew && article && !isInitialized.current) {
+    if (!isNew && resource && !isInitialized.current) {
       isInitialized.current = true;
       form.reset({
-        title: article.title,
-        subject: article.subject,
-        level: article.level,
-        type: article.type,
-        excerpt: article.excerpt,
-        body: article.body,
-        sections: article.sections,
-        status: article.status
+        title: resource.title,
+        subject: resource.subject,
+        level: resource.level,
+        type: resource.type,
+        excerpt: resource.excerpt,
+        body: resource.body,
+        sections: resource.sections,
+        status: resource.status
       });
     }
-  }, [isNew, article, form]);
+  }, [isNew, resource, form]);
 
-  const onSubmit = (data: ArticleDraftValues, statusOverride?: "draft" | "published") => {
+  const onSubmit = (data: ResourceDraftValues, statusOverride?: "draft" | "published") => {
     const finalData = { ...data, status: statusOverride || data.status };
 
     if (isNew) {
       const { status, ...createData } = finalData;
-      createArticle.mutate(
+      createResource.mutate(
         { data: createData },
         {
-          onSuccess: (newArt) => {
+          onSuccess: (newResource) => {
             if (statusOverride === "published") {
-              updateArticle.mutate({ id: newArt.id, data: { status: "published" } }, {
+              updateResource.mutate({ id: newResource.id, data: { status: "published" } }, {
                 onSuccess: () => {
-                  toast.success("Article created and published.");
-                  queryClient.invalidateQueries({ queryKey: getListWorkspaceArticlesQueryKey() });
-                  setLocation(`/workspace/articles/${newArt.id}`);
+                  toast.success("Resource created and published.");
+                  queryClient.invalidateQueries({ queryKey: getListWorkspaceResourcesQueryKey() });
+                  setLocation(`/workspace/resources/${newResource.id}`);
                 }
               });
             } else {
               toast.success("Draft saved successfully.");
-              queryClient.invalidateQueries({ queryKey: getListWorkspaceArticlesQueryKey() });
-              setLocation(`/workspace/articles/${newArt.id}`);
+              queryClient.invalidateQueries({ queryKey: getListWorkspaceResourcesQueryKey() });
+              setLocation(`/workspace/resources/${newResource.id}`);
             }
           },
-          onError: () => toast.error("Failed to create article.")
+          onError: () => toast.error("Failed to create resource.")
         }
       );
-    } else if (articleId) {
-      updateArticle.mutate(
-        { id: articleId, data: finalData as any },
+    } else if (resourceId) {
+      updateResource.mutate(
+        { id: resourceId, data: finalData as any },
         {
           onSuccess: () => {
             const message =
               statusOverride === "published"
-                ? "Article published just now."
+                ? "Resource published just now."
                 : "Draft saved successfully.";
             toast.success(message);
             form.reset(form.getValues());
             showSaveFeedback("saved", message);
-            queryClient.invalidateQueries({ queryKey: getListWorkspaceArticlesQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListWorkspaceResourcesQueryKey() });
           },
           onError: () => {
             const message =
               statusOverride === "published"
                 ? "Complete the required fields before publishing."
-                : "Couldn’t update article. Try again.";
+                : "Couldn’t update resource. Try again.";
             toast.error(message);
             showSaveFeedback("error", message);
           }
@@ -183,7 +183,7 @@ export default function WorkspaceArticleEditor() {
     onSubmit(values, "draft");
   };
 
-  const publishArticle = () => {
+  const publishResource = () => {
     const values = form.getValues();
     const missingFields = [
       values.title.trim().length < 3 ? "a title of at least 3 characters" : null,
@@ -215,13 +215,13 @@ export default function WorkspaceArticleEditor() {
                   ? `sections.${incompleteSectionIndex}.${values.sections[incompleteSectionIndex].heading.trim().length < 2 ? "heading" : "body"}`
                   : null;
 
-    const result = articleSchema.safeParse(values);
+    const result = resourceSchema.safeParse(values);
     if (!result.success) {
       form.clearErrors();
       for (const issue of result.error.issues) {
         const path = issue.path.join(".");
         if (path) {
-          form.setError(path as keyof ArticleFormValues, {
+          form.setError(path as keyof ResourceFormValues, {
             type: "manual",
             message: issue.message,
           });
@@ -233,12 +233,12 @@ export default function WorkspaceArticleEditor() {
           ? `Add ${missingFields.join(", ")} before publishing.`
           : "Check the highlighted fields before publishing.";
       setPublishValidationMessage(message);
-      toast.error("Complete the article before publishing", {
+      toast.error("Complete the resource before publishing", {
         description: message,
       });
       if (firstInvalidField) {
         window.requestAnimationFrame(() => {
-          form.setFocus(firstInvalidField as keyof ArticleFormValues);
+          form.setFocus(firstInvalidField as keyof ResourceFormValues);
         });
       }
       return;
@@ -249,7 +249,7 @@ export default function WorkspaceArticleEditor() {
     onSubmit(result.data, "published");
   };
 
-  if (!isNew && isLoadingArticles) {
+  if (!isNew && isLoadingResources) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[50vh]">
         <Loader2 className="animate-spin text-muted-foreground w-6 h-6" />
@@ -257,10 +257,10 @@ export default function WorkspaceArticleEditor() {
     );
   }
 
-  if (!isNew && !isLoadingArticles && !article) {
+  if (!isNew && !isLoadingResources && !resource) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh]">
-        <h2 className="text-xl font-serif mb-2">Article not found</h2>
+        <h2 className="text-xl font-serif mb-2">Resource not found</h2>
       </div>
     );
   }
@@ -272,7 +272,7 @@ export default function WorkspaceArticleEditor() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-serif text-foreground">
-            {isNew ? "New Draft" : "Edit Article"}
+            {isNew ? "New Draft" : "Edit Resource"}
           </h1>
           {!isNew && currentStatus && (
             <p className="text-sm text-muted-foreground mt-2">
@@ -310,14 +310,14 @@ export default function WorkspaceArticleEditor() {
             type="button"
             variant="outline" 
             onClick={saveDraft}
-            disabled={createArticle.isPending || updateArticle.isPending}
+            disabled={createResource.isPending || updateResource.isPending}
           >
             Save Draft
           </Button>
           <Button 
             type="button"
-            onClick={publishArticle}
-            disabled={createArticle.isPending || updateArticle.isPending}
+            onClick={publishResource}
+            disabled={createResource.isPending || updateResource.isPending}
           >
             {currentStatus === 'published' ? 'Update Published' : 'Publish'}
           </Button>
@@ -336,7 +336,7 @@ export default function WorkspaceArticleEditor() {
                 <FormItem>
                   <FormLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Title</FormLabel>
                   <FormControl>
-                    <Input {...field} className="text-lg font-serif h-12 rounded-none border-border bg-transparent shadow-none" placeholder="Enter article title..." />
+                    <Input {...field} className="text-lg font-serif h-12 rounded-none border-border bg-transparent shadow-none" placeholder="Enter resource title..." />
                   </FormControl>
                   <FormMessage className="text-xs" />
                 </FormItem>
