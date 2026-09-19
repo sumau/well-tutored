@@ -130,6 +130,37 @@ async function startFixture(testCase: FailureCase): Promise<Fixture> {
   };
 }
 
+async function startRedirectFixture(): Promise<{
+  close: () => Promise<void>;
+  sourceUrl: string;
+  destinationUrl: string;
+}> {
+  const destination = await startFixture({
+    name: "redirect destination",
+    expectedMessage: "",
+    respond: () => false,
+  });
+  const sourceServer = createServer((request, response) => {
+    const destinationUrl = new URL(request.url ?? "/", destination.url);
+    response.writeHead(302, { location: destinationUrl.toString() });
+    response.end();
+  });
+  sourceServer.listen(0, "127.0.0.1");
+  await once(sourceServer, "listening");
+  const address = sourceServer.address();
+  assert.ok(address && typeof address === "object");
+
+  return {
+    sourceUrl: `http://127.0.0.1:${address.port}`,
+    destinationUrl: destination.url,
+    close: async () => {
+      sourceServer.close();
+      await once(sourceServer, "close");
+      await destination.close();
+    },
+  };
+}
+
 function pathResponse(
   path: string,
   callback: (
@@ -309,6 +340,35 @@ test("SMOKE_BASE_URL remains an explicit override for published checks", async (
     const result = await runSmokeCommand(fixture.url, { published: true });
     assert.equal(result.exitCode, 0, result.output);
     assert.match(result.output, /Launch smoke check passed/);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("published target checks reject responses redirected to a different origin", async () => {
+  const fixture = await startRedirectFixture();
+
+  try {
+    const result = await runSmokeCommand(fixture.sourceUrl, {
+      published: true,
+    });
+    const escapedSourceUrl = fixture.sourceUrl.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+    const escapedDestinationUrl = fixture.destinationUrl.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      new RegExp(
+        `/api/healthz: response redirected from configured origin "${escapedSourceUrl}" ` +
+          `to final origin "${escapedDestinationUrl}".`,
+      ),
+    );
   } finally {
     await fixture.close();
   }

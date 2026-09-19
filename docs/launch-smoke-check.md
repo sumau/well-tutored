@@ -49,6 +49,10 @@ SMOKE_BASE_URL=https://example.test pnpm smoke:launch:published
 When the override is set, it intentionally skips the published-target
 synchronization comparison. The artifact deployment configuration must still
 be readable and define a valid URL for the default manual check.
+Every request still must finish on the configured target origin. If the target
+redirects to a different origin, the check fails and reports both the
+configured and final origins. This catches an old published hostname that
+redirects to a replacement domain before its responses are treated as healthy.
 The smoke command exits non-zero on any failed check, which makes the failure
 visible in the publish output.
 

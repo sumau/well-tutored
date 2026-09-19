@@ -232,9 +232,11 @@ async function request(
   const url = new URL(path, baseUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  let body: string;
 
   try {
-    const response = await fetch(url, {
+    response = await fetch(url, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -242,12 +244,7 @@ async function request(
         ...init?.headers,
       },
     });
-    const body = await response.text();
-    return {
-      response,
-      body,
-      contentType: response.headers.get("content-type") ?? "",
-    };
+    body = await response.text();
   } catch (error) {
     const reason =
       error instanceof Error && error.name === "AbortError"
@@ -259,6 +256,20 @@ async function request(
   } finally {
     clearTimeout(timeout);
   }
+
+  const finalUrl = new URL(response.url);
+  if (finalUrl.origin !== baseUrl.origin) {
+    throw new SmokeCheckError(
+      `${path}: response redirected from configured origin "${baseUrl.origin}" ` +
+        `to final origin "${finalUrl.origin}".`,
+    );
+  }
+
+  return {
+    response,
+    body,
+    contentType: response.headers.get("content-type") ?? "",
+  };
 }
 
 async function checkJson(
