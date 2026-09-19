@@ -6,9 +6,10 @@ Run the non-mutating production check manually:
 pnpm smoke:launch
 ```
 
-The default target is the configured Well Tutored production URL,
-`https://welltutored.replit.app`. To check another published domain, override
-it explicitly:
+The default target is the production URL in the Well Tutored artifact
+deployment configuration (`artifacts/well-tutored/.replit-artifact/artifact.toml`).
+That value is the single source used by both manual and post-publish checks. To
+check another published domain, override it explicitly:
 
 ```sh
 SMOKE_BASE_URL=https://example.replit.app pnpm smoke:launch
@@ -21,11 +22,12 @@ strict published-target variant automatically:
 pnpm smoke:launch:published
 ```
 
-Automatic mode requires the newly published URL to be available as
-`SMOKE_BASE_URL`, `REPLIT_DEPLOYMENT_URL`, or `REPLIT_DOMAINS`. It never falls
-back to the default domain in automatic mode, so a missing deployment URL
-fails the publish validation instead of checking an older deployment. The
-smoke command exits non-zero on any failed check, which makes the failure
+Automatic mode uses the same artifact deployment URL and does not read
+`REPLIT_DOMAINS` (which can point to a development domain). If the deployment
+configuration is missing, unreadable, or does not define a valid URL, the
+check fails before making any requests. `SMOKE_BASE_URL` remains available for
+custom domains and local verification, including the post-publish command.
+The smoke command exits non-zero on any failed check, which makes the failure
 visible in the publish output.
 
 The check does not require workspace credentials. It verifies:

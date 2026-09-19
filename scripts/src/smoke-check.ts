@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
+
 export {};
 
-const DEFAULT_BASE_URL = "https://welltutored.replit.app";
+const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
+  "../../artifacts/well-tutored/.replit-artifact/artifact.toml",
+  import.meta.url,
+);
+const PRODUCTION_URL_CONFIG_KEY = "SMOKE_PRODUCTION_URL";
 const DEFAULT_TIMEOUT_MS = 15_000;
-const PUBLISHED_CHECK_FLAG = "--published";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -31,7 +36,9 @@ function requireNonEmptyString(
   label: string,
 ): string {
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new SmokeCheckError(`${label}: expected a non-empty "${field}" string.`);
+    throw new SmokeCheckError(
+      `${label}: expected a non-empty "${field}" string.`,
+    );
   }
   return value;
 }
@@ -101,33 +108,44 @@ function expectTutor(value: unknown, label: string): JsonRecord {
   return tutor;
 }
 
+function resolveArtifactProductionUrl(): { value: string; source: string } {
+  let artifactConfig: string;
+
+  try {
+    artifactConfig = readFileSync(ARTIFACT_DEPLOYMENT_CONFIG_URL, "utf8");
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new SmokeCheckError(
+      `Could not read the Well Tutored deployment configuration before making requests: ${reason}`,
+    );
+  }
+
+  const productionEnvSection = artifactConfig.match(
+    /(?:^|\n)\[services\.production\.env\]\s*\n([\s\S]*?)(?=\n(?:\[|\[\[)|$)/,
+  )?.[1];
+  const configuredUrl = productionEnvSection
+    ?.match(/^\s*SMOKE_PRODUCTION_URL\s*=\s*"([^"\r\n]*)"\s*$/m)?.[1]
+    ?.trim();
+
+  if (!configuredUrl) {
+    throw new SmokeCheckError(
+      `The Well Tutored deployment configuration must define ${PRODUCTION_URL_CONFIG_KEY} before making requests.`,
+    );
+  }
+
+  return {
+    value: configuredUrl,
+    source: `Well Tutored artifact deployment configuration (${PRODUCTION_URL_CONFIG_KEY})`,
+  };
+}
+
 function resolveConfiguredBaseUrl(): { value: string; source: string } {
   const explicit = process.env.SMOKE_BASE_URL?.trim();
   if (explicit) {
     return { value: explicit, source: "SMOKE_BASE_URL" };
   }
 
-  if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
-    for (const [name, rawValue] of [
-      ["REPLIT_DEPLOYMENT_URL", process.env.REPLIT_DEPLOYMENT_URL],
-      ["REPLIT_DOMAINS", process.env.REPLIT_DOMAINS],
-    ] as const) {
-      const value = rawValue?.trim().split(/[,\s]+/, 1)[0];
-      if (value) {
-        return {
-          value: /^https?:\/\//i.test(value) ? value : `https://${value}`,
-          source: name,
-        };
-      }
-    }
-
-    throw new SmokeCheckError(
-      "Published launch check requires SMOKE_BASE_URL, REPLIT_DEPLOYMENT_URL, " +
-        "or REPLIT_DOMAINS so it can target the newly published URL.",
-    );
-  }
-
-  return { value: DEFAULT_BASE_URL, source: "default" };
+  return resolveArtifactProductionUrl();
 }
 
 function resolveBaseUrl(): URL {
@@ -211,11 +229,7 @@ async function checkJson(
   return parseJson(data, path);
 }
 
-async function checkPublicPage(
-  baseUrl: URL,
-  path: string,
-  timeoutMs: number,
-) {
+async function checkPublicPage(baseUrl: URL, path: string, timeoutMs: number) {
   const data = await request(baseUrl, path, timeoutMs, {
     headers: { Accept: "text/html" },
   });
@@ -226,7 +240,9 @@ async function checkPublicPage(
     );
   }
   if (!/<title>Well Tutored<\/title>/i.test(data.body)) {
-    throw new SmokeCheckError(`${path}: response did not contain the Well Tutored document.`);
+    throw new SmokeCheckError(
+      `${path}: response did not contain the Well Tutored document.`,
+    );
   }
 }
 
@@ -274,13 +290,19 @@ async function runSmokeCheck() {
     "/api/tutors",
   );
   if (tutors.length === 0) {
-    throw new SmokeCheckError("/api/tutors: expected at least one published tutor.");
+    throw new SmokeCheckError(
+      "/api/tutors: expected at least one published tutor.",
+    );
   }
   const parsedTutors = tutors.map((tutor, index) =>
     expectTutor(tutor, `/api/tutors[${index}]`),
   );
   for (const [index, tutor] of parsedTutors.entries()) {
-    const resources = requireArray(tutor.resources, `/api/tutors[${index}].resources`, "tutor");
+    const resources = requireArray(
+      tutor.resources,
+      `/api/tutors[${index}].resources`,
+      "tutor",
+    );
     resources.forEach((resource, resourceIndex) =>
       expectResource(
         resource,
@@ -302,21 +324,29 @@ async function runSmokeCheck() {
     resources = resourceCatalogue;
   } else {
     const catalogue = requireRecord(resourceCatalogue, "/api/resources");
-    resources = requireArray(catalogue.items, "/api/resources.items", "/api/resources");
+    resources = requireArray(
+      catalogue.items,
+      "/api/resources.items",
+      "/api/resources",
+    );
     if (catalogue.page !== 1) {
       throw new SmokeCheckError("/api/resources: expected the first page.");
     }
     requireInteger(catalogue.pageSize, "pageSize", "/api/resources");
     requireInteger(catalogue.total, "total", "/api/resources");
     if (typeof catalogue.hasMore !== "boolean") {
-      throw new SmokeCheckError("/api/resources: expected boolean \"hasMore\".");
+      throw new SmokeCheckError('/api/resources: expected boolean "hasMore".');
     }
     if ((catalogue.total as number) < resources.length) {
-      throw new SmokeCheckError("/api/resources: total was smaller than items.length.");
+      throw new SmokeCheckError(
+        "/api/resources: total was smaller than items.length.",
+      );
     }
   }
   if (resources.length === 0) {
-    throw new SmokeCheckError("/api/resources: expected at least one published resource.");
+    throw new SmokeCheckError(
+      "/api/resources: expected at least one published resource.",
+    );
   }
   const parsedResources = resources.map((resource, index) =>
     expectResource(resource, `/api/resources[${index}]`),
@@ -329,7 +359,11 @@ async function runSmokeCheck() {
   }
 
   const tutorSlug = parsedTutors[0].slug as string;
-  await checkPublicPage(baseUrl, `/tutors/${encodeURIComponent(tutorSlug)}`, timeoutMs);
+  await checkPublicPage(
+    baseUrl,
+    `/tutors/${encodeURIComponent(tutorSlug)}`,
+    timeoutMs,
+  );
   passed.push(`/tutors/${tutorSlug}`);
 
   const resourceSlug = parsedResources[0].slug as string;
@@ -367,7 +401,7 @@ async function runSmokeCheck() {
   );
   if (recoveryHealth.status !== "ok") {
     throw new SmokeCheckError(
-      "/api/healthz after invalid enquiry: expected status \"ok\".",
+      '/api/healthz after invalid enquiry: expected status "ok".',
     );
   }
   passed.push("/api/healthz after invalid enquiry");

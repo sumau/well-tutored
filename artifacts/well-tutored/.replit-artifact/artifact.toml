@@ -26,3 +26,6 @@ to = "/index.html"
 [services.env]
 PORT = "22104"
 BASE_PATH = "/"
+
+[services.production.env]
+SMOKE_PRODUCTION_URL = "https://welltutored.replit.app"
