@@ -1,25 +1,36 @@
-import { ReactNode } from "react";
-import { useGetWorkspaceSession } from "@workspace/api-client-react";
+import * as React from "react";
+import { type ReactNode } from "react";
+import {
+  type WorkspaceSession,
+  useGetWorkspaceSession,
+} from "@workspace/api-client-react";
 import { AlertCircle, Clock3 } from "lucide-react";
 import { useAuth, useClerk } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 
-export function WorkspaceAuthBoundary({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { signOut } = useClerk();
-  const {
-    data: session,
-    isLoading,
-    isError,
-    isFetching,
-    refetch,
-  } = useGetWorkspaceSession({
-    query: {
-      enabled: isLoaded && isSignedIn,
-      retry: false,
-    },
-  });
+type WorkspaceAuthBoundaryViewProps = {
+  children: ReactNode;
+  isLoaded: boolean;
+  isSignedIn: boolean | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  session: WorkspaceSession | undefined;
+  onRetry: () => void;
+  onSignOut: () => void;
+};
 
+export function WorkspaceAuthBoundaryView({
+  children,
+  isLoaded,
+  isSignedIn,
+  isLoading,
+  isError,
+  isFetching,
+  session,
+  onRetry,
+  onSignOut,
+}: WorkspaceAuthBoundaryViewProps) {
   if (!isLoaded || !isSignedIn || isLoading) {
     return (
       <div className="flex-1 min-h-[60vh] p-6 md:p-12">
@@ -45,10 +56,10 @@ export function WorkspaceAuthBoundary({ children }: { children: ReactNode }) {
           We could not load your workspace session.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+          <Button variant="outline" onClick={onRetry} disabled={isFetching}>
             {isFetching ? "Retrying..." : "Try again"}
           </Button>
-          <Button variant="ghost" onClick={() => signOut()}>
+          <Button variant="ghost" onClick={onSignOut}>
             Sign out
           </Button>
         </div>
@@ -65,7 +76,7 @@ export function WorkspaceAuthBoundary({ children }: { children: ReactNode }) {
           Your account has been created successfully. The agency owner will
           review your details and activate your profile soon.
         </p>
-        <Button variant="outline" onClick={() => signOut()}>
+        <Button variant="outline" onClick={onSignOut}>
           Sign Out
         </Button>
       </div>
@@ -73,4 +84,37 @@ export function WorkspaceAuthBoundary({ children }: { children: ReactNode }) {
   }
 
   return <div className="flex-1 bg-muted/20">{children}</div>;
+}
+
+export function WorkspaceAuthBoundary({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
+  const {
+    data: session,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useGetWorkspaceSession({
+    query: {
+      enabled: isLoaded && isSignedIn,
+      retry: false,
+    },
+  });
+
+  return (
+    <WorkspaceAuthBoundaryView
+      {...{
+        children,
+        isLoaded,
+        isSignedIn,
+        isLoading,
+        isError,
+        isFetching,
+        session,
+      }}
+      onRetry={() => void refetch()}
+      onSignOut={() => void signOut()}
+    />
+  );
 }
