@@ -426,6 +426,74 @@ test("a failed submission keeps an announced form error and a successful retry f
   }
 });
 
+test("a dropped connection keeps the enquiry details and supports a keyboard retry", async () => {
+  const rendered = await renderForm();
+  const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
+  const submitButton = rendered.container.querySelector<HTMLButtonElement>("[data-testid=button-submit-enquiry]")!;
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+
+    if (requestCount === 1) {
+      throw new TypeError("The network connection was lost.");
+    }
+
+    return new Response(
+      JSON.stringify({
+        id: 42,
+        tutorName: "Alice Smith",
+        receivedAt: "2026-09-19T12:00:00.000Z",
+        deliveryStatus: "delivered",
+        message: "Your enquiry has been sent securely.",
+      }),
+      {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await act(async () => {
+      fillCompleteForm(rendered.container);
+      submitButton.focus();
+      submitWithKeyboard(form, submitButton);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const submitError = rendered.container.querySelector("[data-testid=error-enquiry-submit]")!;
+    assert.equal(submitError.getAttribute("role"), "alert");
+    assert.equal(
+      submitError.textContent,
+      "We could not record your enquiry. Please check the details and try again.",
+    );
+    assert.equal(document.activeElement, submitButton);
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-parent-name")?.value, "Eleanor James");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-parent-email")?.value, "eleanor@example.com");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-student-name")?.value, "Maya");
+    assert.equal(rendered.container.querySelector<HTMLSelectElement>("#enquiry-student-age")?.value, "13-15");
+    assert.equal(rendered.container.querySelector<HTMLInputElement>("#enquiry-subject-level")?.value, "GCSE English Literature");
+    assert.equal(rendered.container.querySelector<HTMLTextAreaElement>("#enquiry-message")?.value, "Maya would benefit from essay planning support.");
+
+    await act(async () => {
+      submitWithKeyboard(form, submitButton);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const receipt = rendered.container.querySelector("[data-testid=enquiry-success]")!;
+    assert.equal(requestCount, 2);
+    assert.equal(document.activeElement, receipt);
+    assert.equal(receipt.getAttribute("role"), "status");
+    assert.equal(receipt.getAttribute("aria-live"), "polite");
+    assert.match(receipt.textContent ?? "", /Message delivered/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await cleanupForm(rendered);
+  }
+});
+
 test("a successful receipt receives focus and announces the delivery outcome", async () => {
   const rendered = await renderForm();
   const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;

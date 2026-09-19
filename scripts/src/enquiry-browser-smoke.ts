@@ -273,13 +273,7 @@ async function runBrowserSmokeCheck() {
 
       interceptedEnquiryRequests += 1;
       if (interceptedEnquiryRequests === 1) {
-        await route.fulfill({
-          status: 500,
-          contentType: "application/json",
-          body: JSON.stringify({
-            message: "The enquiry could not be recorded.",
-          }),
-        });
+        await route.abort("timedout");
         return;
       }
 
@@ -425,7 +419,7 @@ async function runBrowserSmokeCheck() {
     console.log(`Enquiry keyboard smoke check passed for ${baseUrl.origin}`);
     console.log("  ✓ native Tab order and disabled-submit behavior");
     console.log("  ✓ Enter validation recovery");
-    console.log("  ✓ announced server-error recovery and keyboard retry");
+    console.log("  ✓ announced network-error recovery and keyboard retry");
     console.log("  ✓ standalone keyboard submission and announced success receipt");
     console.log("  ✓ preselected-tutor profile submission and announced success receipt");
   } finally {
