@@ -205,21 +205,36 @@ const failureCases: FailureCase[] = [
   },
 ];
 
-function runSmokeCommand(baseUrl: string): Promise<{
+function runSmokeCommand(
+  baseUrl: string | undefined,
+  options: { published?: boolean; publishedUrl?: string } = {},
+): Promise<{
   exitCode: number | null;
   output: string;
 }> {
   const scriptsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const smokeFile = resolve(scriptsRoot, "src/smoke-check.ts");
-  const child = spawn(process.execPath, ["--import", "tsx", smokeFile], {
-    cwd: scriptsRoot,
-    env: {
-      ...process.env,
-      SMOKE_BASE_URL: baseUrl,
-      SMOKE_TIMEOUT_MS: "2000",
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      smokeFile,
+      ...(options.published ? ["--published"] : []),
+    ],
+    {
+      cwd: scriptsRoot,
+      env: {
+        ...process.env,
+        ...(baseUrl ? { SMOKE_BASE_URL: baseUrl } : { SMOKE_BASE_URL: "" }),
+        ...(options.publishedUrl
+          ? { SMOKE_PUBLISHED_URL: options.publishedUrl }
+          : { SMOKE_PUBLISHED_URL: "" }),
+        SMOKE_TIMEOUT_MS: "2000",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
     },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  );
 
   return new Promise((resolveResult, reject) => {
     let output = "";
@@ -233,6 +248,49 @@ function runSmokeCommand(baseUrl: string): Promise<{
     child.once("close", (exitCode) => resolveResult({ exitCode, output }));
   });
 }
+
+test("published check rejects missing current deployment metadata", async () => {
+  const result = await runSmokeCommand(undefined, { published: true });
+
+  assert.notEqual(result.exitCode, 0, result.output);
+  assert.match(
+    result.output,
+    /Published launch check requires SMOKE_PUBLISHED_URL from the current Publishing metadata/,
+  );
+});
+
+test("published check rejects a deployment domain that drifted from the artifact target", async () => {
+  const result = await runSmokeCommand(undefined, {
+    published: true,
+    publishedUrl: "https://custom.example",
+  });
+
+  assert.notEqual(result.exitCode, 0, result.output);
+  assert.match(
+    result.output,
+    /does not match the Well Tutored artifact smoke target/,
+  );
+  assert.match(
+    result.output,
+    /Update SMOKE_PRODUCTION_URL in artifacts\/well-tutored\/\.replit-artifact\/artifact\.toml/,
+  );
+});
+
+test("SMOKE_BASE_URL remains an explicit override for published checks", async () => {
+  const fixture = await startFixture({
+    name: "healthy override",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, { published: true });
+    assert.equal(result.exitCode, 0, result.output);
+    assert.match(result.output, /Launch smoke check passed/);
+  } finally {
+    await fixture.close();
+  }
+});
 
 for (const testCase of failureCases) {
   test(`fixture rejects ${testCase.name}`, async () => {

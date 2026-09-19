@@ -7,7 +7,9 @@ const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
   import.meta.url,
 );
 const PRODUCTION_URL_CONFIG_KEY = "SMOKE_PRODUCTION_URL";
+const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
 const DEFAULT_TIMEOUT_MS = 15_000;
+const PUBLISHED_CHECK_FLAG = "--published";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -145,29 +147,65 @@ function resolveConfiguredBaseUrl(): { value: string; source: string } {
     return { value: explicit, source: "SMOKE_BASE_URL" };
   }
 
+  if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
+    const publishedUrl = process.env[PUBLISHED_URL_ENV_KEY]?.trim();
+    if (!publishedUrl) {
+      throw new SmokeCheckError(
+        `Published launch check requires ${PUBLISHED_URL_ENV_KEY} from the current Publishing metadata. ` +
+          `Set it to the newly published URL, or set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
+      );
+    }
+
+    const artifactUrl = resolveArtifactProductionUrl();
+    const publishedOrigin = parseHttpUrl(
+      publishedUrl,
+      PUBLISHED_URL_ENV_KEY,
+    ).origin;
+    const artifactOrigin = parseHttpUrl(
+      artifactUrl.value,
+      artifactUrl.source,
+    ).origin;
+
+    if (publishedOrigin !== artifactOrigin) {
+      throw new SmokeCheckError(
+        `Published deployment URL (${PUBLISHED_URL_ENV_KEY}) "${publishedOrigin}" ` +
+          `does not match the Well Tutored artifact smoke target ` +
+          `(${PRODUCTION_URL_CONFIG_KEY}) "${artifactOrigin}". ` +
+          `Update ${PRODUCTION_URL_CONFIG_KEY} in ` +
+          `artifacts/well-tutored/.replit-artifact/artifact.toml ` +
+          `after a domain change, or set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
+      );
+    }
+
+    return { value: publishedUrl, source: PUBLISHED_URL_ENV_KEY };
+  }
+
   return resolveArtifactProductionUrl();
 }
 
-function resolveBaseUrl(): URL {
-  const configured = resolveConfiguredBaseUrl();
+function parseHttpUrl(value: string, source: string): URL {
   let baseUrl: URL;
-
   try {
-    baseUrl = new URL(configured.value);
+    baseUrl = new URL(value);
   } catch {
     throw new SmokeCheckError(
-      `${configured.source} must be an absolute HTTP(S) URL; received "${configured.value}".`,
+      `${source} must be an absolute HTTP(S) URL; received "${value}".`,
     );
   }
 
   if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
     throw new SmokeCheckError(
-      `${configured.source} must use http or https; received "${baseUrl.protocol}".`,
+      `${source} must use http or https; received "${baseUrl.protocol}".`,
     );
   }
 
   baseUrl.pathname = baseUrl.pathname.replace(/\/+$/, "") || "/";
   return baseUrl;
+}
+
+function resolveBaseUrl(): URL {
+  const configured = resolveConfiguredBaseUrl();
+  return parseHttpUrl(configured.value, configured.source);
 }
 
 function resolveTimeoutMs(): number {

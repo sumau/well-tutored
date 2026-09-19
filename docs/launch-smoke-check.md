@@ -22,11 +22,30 @@ strict published-target variant automatically:
 pnpm smoke:launch:published
 ```
 
-Automatic mode uses the same artifact deployment URL and does not read
-`REPLIT_DOMAINS` (which can point to a development domain). If the deployment
-configuration is missing, unreadable, or does not define a valid URL, the
-check fails before making any requests. `SMOKE_BASE_URL` remains available for
-custom domains and local verification, including the post-publish command.
+Before running the published-target variant, provide the URL reported by the
+current Publishing run:
+
+```sh
+SMOKE_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:launch:published
+```
+
+Published mode compares `SMOKE_PUBLISHED_URL` with
+`SMOKE_PRODUCTION_URL` in the artifact deployment configuration before making
+requests. If they differ, update the artifact value after a domain change and
+rerun the check. Missing or mismatched metadata fails with an actionable
+message instead of silently checking an older deployment. The check does not
+read `REPLIT_DOMAINS`, which can point to a development domain.
+
+`SMOKE_BASE_URL` remains available as an explicit override for custom domains
+and local verification, including the published command:
+
+```sh
+SMOKE_BASE_URL=https://example.test pnpm smoke:launch:published
+```
+
+When the override is set, it intentionally skips the published-target
+synchronization comparison. The artifact deployment configuration must still
+be readable and define a valid URL for the default manual check.
 The smoke command exits non-zero on any failed check, which makes the failure
 visible in the publish output.
 
