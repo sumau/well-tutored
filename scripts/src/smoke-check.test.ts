@@ -275,7 +275,11 @@ const failureCases: FailureCase[] = [
 
 function runSmokeCommand(
   baseUrl: string | undefined,
-  options: { published?: boolean; publishedUrl?: string } = {},
+  options: {
+    published?: boolean;
+    publishedUrl?: string;
+    timeoutMs?: string;
+  } = {},
 ): Promise<{
   exitCode: number | null;
   output: string;
@@ -298,7 +302,7 @@ function runSmokeCommand(
         ...(options.publishedUrl
           ? { SMOKE_PUBLISHED_URL: options.publishedUrl }
           : { SMOKE_PUBLISHED_URL: "" }),
-        SMOKE_TIMEOUT_MS: "2000",
+        SMOKE_TIMEOUT_MS: options.timeoutMs ?? "2000",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -314,6 +318,57 @@ function runSmokeCommand(
     });
     child.once("error", reject);
     child.once("close", (exitCode) => resolveResult({ exitCode, output }));
+  });
+}
+
+test("malformed SMOKE_BASE_URL fails before contacting loopback or production", async () => {
+  const fixture = await startFixture({
+    name: "unused URL validation fixture",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand("not-a-url");
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /SMOKE_BASE_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
+    );
+    assert.deepEqual(fixture.requests, []);
+    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+  } finally {
+    await fixture.close();
+  }
+});
+
+for (const timeoutMs of ["not-a-number", "0", "-1"]) {
+  test(`invalid SMOKE_TIMEOUT_MS="${timeoutMs}" fails before making requests`, async () => {
+    const fixture = await startFixture({
+      name: `unused timeout validation fixture (${timeoutMs})`,
+      expectedMessage: "",
+      respond: () => false,
+    });
+
+    try {
+      const result = await runSmokeCommand(fixture.url, { timeoutMs });
+
+      assert.notEqual(result.exitCode, 0, result.output);
+      assert.match(
+        result.output,
+        new RegExp(
+          `SMOKE_TIMEOUT_MS must be a positive number; received "${timeoutMs.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&",
+          )}"\\.`,
+        ),
+      );
+      assert.deepEqual(fixture.requests, []);
+      assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+    } finally {
+      await fixture.close();
+    }
   });
 }
 
