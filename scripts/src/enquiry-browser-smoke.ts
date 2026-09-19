@@ -120,6 +120,7 @@ async function runTutorProfileSmokeCheck(
   timeoutMs: number,
 ) {
   const tutor = await publishedAcceptingTutor(page, baseUrl, timeoutMs);
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(
     new URL(
       `/tutors/${encodeURIComponent(tutor.slug)}#enquire`,
