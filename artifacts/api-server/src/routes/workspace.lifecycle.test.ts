@@ -13,6 +13,10 @@ import {
   workspaceAccountsTable,
   tutorsTable,
 } from "@workspace/db";
+import {
+  ListWorkspaceResourcesResponse,
+  UpdateWorkspaceResourceResponse,
+} from "@workspace/api-zod";
 import contentRouter from "./content";
 import workspaceRouter from "./workspace";
 
@@ -21,16 +25,19 @@ const pendingUserId = "workspace-lifecycle-pending";
 const nonOwnerUserId = "workspace-lifecycle-non-owner";
 const autoProvisionUserId = "workspace-lifecycle-auto-provision";
 const ownerAliasUserId = "workspace-lifecycle-owner-alias";
+const legacyAliasTutorUserId = "workspace-lifecycle-legacy-alias";
 const tutorName = "Lifecycle Tutor";
 const secondTutorName = "Lifecycle Tutor Two";
 const pendingTutorName = "Lifecycle Pending";
 const autoProvisionTutorName = "Auto Provision Tutor";
+const legacyAliasTutorName = "Legacy Alias Tutor";
 const clerkEmailByUserId = new Map<string, string>([
   [ownerUserId, "lifecycle-owner@example.test"],
   [pendingUserId, "lifecycle-pending@example.test"],
   [nonOwnerUserId, "lifecycle-non-owner@example.test"],
   [autoProvisionUserId, "auto-provision@example.test"],
   [ownerAliasUserId, "lifecycle-owner@example.test"],
+  [legacyAliasTutorUserId, "legacy-alias@example.test"],
 ]);
 const clerkUsersPrototype = Object.getPrototypeOf(clerkClient.users) as {
   getUser: typeof clerkClient.users.getUser;
@@ -142,6 +149,7 @@ before(async () => {
               secondTutorName,
               pendingTutorName,
               autoProvisionTutorName,
+              legacyAliasTutorName,
             ]),
           ),
       ),
@@ -153,6 +161,7 @@ before(async () => {
       nonOwnerUserId,
       autoProvisionUserId,
       ownerAliasUserId,
+      legacyAliasTutorUserId,
     ]),
   );
   await db
@@ -163,6 +172,7 @@ before(async () => {
         secondTutorName,
         pendingTutorName,
         autoProvisionTutorName,
+        legacyAliasTutorName,
       ]),
     );
 
@@ -191,6 +201,12 @@ before(async () => {
       displayName: autoProvisionTutorName,
       role: "pending",
     },
+    {
+      clerkUserId: legacyAliasTutorUserId,
+      email: "legacy-alias@example.test",
+      displayName: legacyAliasTutorName,
+      role: "pending",
+    },
   ]);
 });
 
@@ -210,6 +226,7 @@ after(async () => {
               secondTutorName,
               pendingTutorName,
               autoProvisionTutorName,
+              legacyAliasTutorName,
             ]),
           ),
       ),
@@ -221,6 +238,7 @@ after(async () => {
       nonOwnerUserId,
       autoProvisionUserId,
       ownerAliasUserId,
+      legacyAliasTutorUserId,
     ]),
   );
   await db
@@ -231,6 +249,7 @@ after(async () => {
         secondTutorName,
         pendingTutorName,
         autoProvisionTutorName,
+        legacyAliasTutorName,
       ]),
     );
   testServer.server.close();
@@ -741,6 +760,191 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   await db
     .delete(tutorsTable)
     .where(eq(tutorsTable.name, pendingTutorName));
+});
+
+test("legacy articles alias supports list, edit, and delete permissions", async () => {
+  const createdTutor = await request(
+    "/api/workspace/tutors",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...tutorInput,
+        name: legacyAliasTutorName,
+        initials: "LA",
+      }),
+    },
+    ownerUserId,
+  );
+  assert.equal(createdTutor.response.status, 201);
+  const tutorId = createdTutor.body.id as number;
+
+  const accounts = await request("/api/workspace/accounts", {}, ownerUserId);
+  const tutorAccount = accounts.body.find(
+    (account: { email: string }) => account.email === "legacy-alias@example.test",
+  );
+  assert(tutorAccount);
+
+  const assigned = await request(
+    `/api/workspace/accounts/${tutorAccount.id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ role: "tutor", tutorId }),
+    },
+    ownerUserId,
+  );
+  assert.equal(assigned.response.status, 200);
+
+  const tutorDraft = await request(
+    "/api/workspace/articles",
+    {
+      method: "POST",
+      body: JSON.stringify({ title: "Legacy alias tutor draft" }),
+    },
+    legacyAliasTutorUserId,
+  );
+  assert.equal(tutorDraft.response.status, 201);
+  const tutorResourceId = tutorDraft.body.id as number;
+
+  const tutorList = await request(
+    "/api/workspace/articles",
+    {},
+    legacyAliasTutorUserId,
+  );
+  assert.equal(tutorList.response.status, 200);
+  const tutorResources = ListWorkspaceResourcesResponse.parse(
+    tutorList.body,
+  );
+  assert.equal(
+    tutorResources.some((resource) => resource.id === tutorResourceId),
+    true,
+  );
+  assert.equal(
+    tutorResources.find((resource) => resource.id === tutorResourceId)
+      ?.tutorName,
+    legacyAliasTutorName,
+  );
+
+  const ownerList = await request("/api/workspace/articles", {}, ownerUserId);
+  assert.equal(ownerList.response.status, 200);
+  const ownerResources = ListWorkspaceResourcesResponse.parse(
+    ownerList.body,
+  );
+  assert.equal(
+    ownerResources.some((resource) => resource.id === tutorResourceId),
+    true,
+  );
+
+  const unauthenticatedList = await request("/api/workspace/articles");
+  assert.equal(unauthenticatedList.response.status, 401);
+  const nonOwnerList = await request(
+    "/api/workspace/articles",
+    {},
+    nonOwnerUserId,
+  );
+  assert.equal(nonOwnerList.response.status, 403);
+
+  const tutorUpdate = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Legacy alias tutor edit" }),
+    },
+    legacyAliasTutorUserId,
+  );
+  assert.equal(tutorUpdate.response.status, 200);
+  const updatedByTutor = UpdateWorkspaceResourceResponse.parse(
+    tutorUpdate.body,
+  );
+  assert.equal(updatedByTutor.id, tutorResourceId);
+  assert.equal(updatedByTutor.title, "Legacy alias tutor edit");
+
+  const ownerUpdate = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ subject: "History" }),
+    },
+    ownerUserId,
+  );
+  assert.equal(ownerUpdate.response.status, 200);
+  const updatedByOwner = UpdateWorkspaceResourceResponse.parse(
+    ownerUpdate.body,
+  );
+  assert.equal(updatedByOwner.id, tutorResourceId);
+  assert.equal(updatedByOwner.subject, "History");
+
+  const unauthenticatedUpdate = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Unauthenticated edit" }),
+    },
+  );
+  assert.equal(unauthenticatedUpdate.response.status, 401);
+  const nonOwnerUpdate = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Non-owner edit" }),
+    },
+    nonOwnerUserId,
+  );
+  assert.equal(nonOwnerUpdate.response.status, 403);
+
+  const secondTutorDraft = await request(
+    "/api/workspace/articles",
+    {
+      method: "POST",
+      body: JSON.stringify({ title: "Legacy alias owner delete" }),
+    },
+    legacyAliasTutorUserId,
+  );
+  assert.equal(secondTutorDraft.response.status, 201);
+  const ownerDeletedResourceId = secondTutorDraft.body.id as number;
+
+  const unauthenticatedDelete = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    { method: "DELETE" },
+  );
+  assert.equal(unauthenticatedDelete.response.status, 401);
+  const nonOwnerDelete = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    { method: "DELETE" },
+    nonOwnerUserId,
+  );
+  assert.equal(nonOwnerDelete.response.status, 403);
+
+  const tutorDelete = await request(
+    `/api/workspace/articles/${tutorResourceId}`,
+    { method: "DELETE" },
+    legacyAliasTutorUserId,
+  );
+  assert.equal(tutorDelete.response.status, 204);
+
+  const ownerDelete = await request(
+    `/api/workspace/articles/${ownerDeletedResourceId}`,
+    { method: "DELETE" },
+    ownerUserId,
+  );
+  assert.equal(ownerDelete.response.status, 204);
+
+  const canonicalListAfterDeletes = await request(
+    "/api/workspace/resources",
+    {},
+    ownerUserId,
+  );
+  assert.equal(canonicalListAfterDeletes.response.status, 200);
+  const remainingCanonicalResources = ListWorkspaceResourcesResponse.parse(
+    canonicalListAfterDeletes.body,
+  );
+  assert.equal(
+    remainingCanonicalResources.some(
+      (resource) =>
+        resource.id === tutorResourceId ||
+        resource.id === ownerDeletedResourceId,
+    ),
+    false,
+  );
 });
 
 test("approved tutor receives a private draft on first workspace sign-in", async () => {
