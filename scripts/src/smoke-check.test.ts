@@ -211,6 +211,13 @@ const failureCases: FailureCase[] = [
     }),
   },
   {
+    name: "connections that are dropped by the loopback service",
+    expectedMessage: "/api/healthz: request failed:",
+    respond: pathResponse("/api/healthz", (_request, response) => {
+      response.destroy();
+    }),
+  },
+  {
     name: "malformed Clerk payloads",
     expectedMessage:
       "/api/__clerk/v1/environment: unexpected auth_config object.",
