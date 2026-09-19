@@ -144,6 +144,41 @@ const tutorSeeds = [
     tint: "#83B7B0",
     sortOrder: 4,
   },
+  {
+    slug: "nora-lewis",
+    name: "Nora Lewis",
+    firstName: "Nora",
+    lastName: "Lewis",
+    initials: "NL",
+    subject: "Physics & Mathematics",
+    university: "University of Bristol",
+    qualification: "BSc (Hons), Physics",
+    bio: "A physics tutor who helps students make sense of challenging ideas through clear explanations and patient problem-solving.",
+    style: "Clear, patient, confidence-building",
+    profileSummary:
+      "Nora helps GCSE and A-level students make difficult physics and mathematics ideas feel clear, connected and manageable.",
+    teachingIntro:
+      "Nora's sessions are calm and practical. She breaks complex ideas into smaller steps, then gives students time to test their understanding and build confidence.",
+    teachingPoints: [
+      {
+        title: "Start with the picture",
+        body: "Nora uses diagrams and plain language to make the shape of a problem visible before choosing a formula.",
+      },
+      {
+        title: "Work it through",
+        body: "Each step is explained and checked, so students can see why a method works rather than memorising a pattern.",
+      },
+      {
+        title: "Build confidence",
+        body: "Practice focuses on the next useful challenge, helping students recognise their progress as well as their gaps.",
+      },
+    ],
+    rate: "50",
+    availability: "unavailable" as const,
+    profileStatus: "published" as const,
+    tint: "#C7A6A0",
+    sortOrder: 5,
+  },
 ];
 
 type ResourceSeed = {
