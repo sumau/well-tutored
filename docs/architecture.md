@@ -64,3 +64,17 @@ artifacts and should not be edited manually.
 - Archived tutors must be restored before editing.
 - A tutor account can edit its own resources; an owner can manage all workspace
   records.
+
+### Tutor profiles versus resources
+
+Tutor profiles keep the published profile in `tutors` and store workspace edits
+in `tutor_profile_drafts`. This means the public site continues to show the
+last published profile while a new version is being edited, and the draft can
+be published or discarded as a whole.
+
+Resources use a single `resources` row with a `draft` or `published` status.
+New or explicitly draft resources do not appear publicly until published.
+Editing an already-published resource while keeping its status as `published`
+updates the public resource in place; changing it to `draft` removes it from
+public results while it is being revised. Resources do not currently keep a
+private draft alongside a live published version.
