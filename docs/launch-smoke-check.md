@@ -1,6 +1,6 @@
 # Launch smoke check
 
-Run the non-mutating production check after publishing:
+Run the non-mutating production check manually:
 
 ```sh
 pnpm smoke:launch
@@ -13,6 +13,20 @@ it explicitly:
 ```sh
 SMOKE_BASE_URL=https://example.replit.app pnpm smoke:launch
 ```
+
+The root package also registers a `postpublish` lifecycle hook. It runs the
+strict published-target variant automatically:
+
+```sh
+pnpm smoke:launch:published
+```
+
+Automatic mode requires the newly published URL to be available as
+`SMOKE_BASE_URL`, `REPLIT_DEPLOYMENT_URL`, or `REPLIT_DOMAINS`. It never falls
+back to the default domain in automatic mode, so a missing deployment URL
+fails the publish validation instead of checking an older deployment. The
+smoke command exits non-zero on any failed check, which makes the failure
+visible in the publish output.
 
 The check does not require workspace credentials. It verifies:
 

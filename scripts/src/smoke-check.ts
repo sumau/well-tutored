@@ -2,6 +2,7 @@ export {};
 
 const DEFAULT_BASE_URL = "https://welltutored.replit.app";
 const DEFAULT_TIMEOUT_MS = 15_000;
+const PUBLISHED_CHECK_FLAG = "--published";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -100,21 +101,50 @@ function expectTutor(value: unknown, label: string): JsonRecord {
   return tutor;
 }
 
+function resolveConfiguredBaseUrl(): { value: string; source: string } {
+  const explicit = process.env.SMOKE_BASE_URL?.trim();
+  if (explicit) {
+    return { value: explicit, source: "SMOKE_BASE_URL" };
+  }
+
+  if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
+    for (const [name, rawValue] of [
+      ["REPLIT_DEPLOYMENT_URL", process.env.REPLIT_DEPLOYMENT_URL],
+      ["REPLIT_DOMAINS", process.env.REPLIT_DOMAINS],
+    ] as const) {
+      const value = rawValue?.trim().split(/[,\s]+/, 1)[0];
+      if (value) {
+        return {
+          value: /^https?:\/\//i.test(value) ? value : `https://${value}`,
+          source: name,
+        };
+      }
+    }
+
+    throw new SmokeCheckError(
+      "Published launch check requires SMOKE_BASE_URL, REPLIT_DEPLOYMENT_URL, " +
+        "or REPLIT_DOMAINS so it can target the newly published URL.",
+    );
+  }
+
+  return { value: DEFAULT_BASE_URL, source: "default" };
+}
+
 function resolveBaseUrl(): URL {
-  const configured = process.env.SMOKE_BASE_URL ?? DEFAULT_BASE_URL;
+  const configured = resolveConfiguredBaseUrl();
   let baseUrl: URL;
 
   try {
-    baseUrl = new URL(configured);
+    baseUrl = new URL(configured.value);
   } catch {
     throw new SmokeCheckError(
-      `SMOKE_BASE_URL must be an absolute HTTP(S) URL; received "${configured}".`,
+      `${configured.source} must be an absolute HTTP(S) URL; received "${configured.value}".`,
     );
   }
 
   if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
     throw new SmokeCheckError(
-      `SMOKE_BASE_URL must use http or https; received "${baseUrl.protocol}".`,
+      `${configured.source} must use http or https; received "${baseUrl.protocol}".`,
     );
   }
 
