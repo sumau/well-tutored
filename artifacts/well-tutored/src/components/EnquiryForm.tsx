@@ -14,10 +14,12 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
   const createEnquiry = useCreateEnquiry();
   const [receipt, setReceipt] = useState<EnquiryReceipt | null>(null);
   const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const receiptRef = useRef<HTMLDivElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const submissionInFlight = useRef(false);
   const focusFirstFieldOnReset = useRef(false);
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>({});
 
@@ -86,17 +88,21 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
       result[key] = true;
       return result;
     }, {}));
-    if (!isComplete || createEnquiry.isPending) {
+    if (!isComplete || submissionInFlight.current || createEnquiry.isPending) {
       const firstInvalid = Object.keys(errors).find((key) => errors[key]);
       if (firstInvalid) fieldRefs.current[firstInvalid]?.focus();
       return;
     }
     setSubmitError("");
+    submissionInFlight.current = true;
+    setIsSubmitting(true);
 
     createEnquiry.mutate({
       data: form
     }, {
       onSuccess: (result) => {
+        submissionInFlight.current = false;
+        setIsSubmitting(false);
         setReceipt(result);
         setForm({
           name: "",
@@ -111,6 +117,8 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
         setTouched({});
       },
       onError: () => {
+        submissionInFlight.current = false;
+        setIsSubmitting(false);
         setSubmitError("We could not record your enquiry. Please check the details and try again.");
       }
     });
@@ -347,17 +355,17 @@ export function EnquiryForm({ tutor, tutors = [], compact = false }: EnquiryForm
         )}
 
         <p aria-live="polite" role="status" className="sr-only">
-          {createEnquiry.isPending ? "Submitting your enquiry." : ""}
+          {isSubmitting ? "Submitting your enquiry." : ""}
         </p>
 
         <button 
           type="submit"
           ref={submitButtonRef}
-          disabled={!isComplete || createEnquiry.isPending}
+          disabled={!isComplete || isSubmitting || createEnquiry.isPending}
           className="mt-2 bg-foreground text-background text-[12px] font-bold px-6 py-4 hover:bg-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="button-submit-enquiry"
         >
-          {createEnquiry.isPending ? 'Submitting...' : 'Submit enquiry'} <ArrowRight size={15} />
+          {isSubmitting ? 'Submitting...' : 'Submit enquiry'} <ArrowRight size={15} />
         </button>
 
         <div className="mt-4 pt-4 border-t border-border flex items-start gap-3 text-[11px] text-muted-foreground leading-[1.5]">

@@ -346,6 +346,61 @@ test("keyboard users can complete an enquiry, recover validation focus, and reac
   }
 });
 
+test("repeated Enter presses send one enquiry while the request is pending", async () => {
+  const rendered = await renderForm();
+  const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
+  const submitButton = rendered.container.querySelector<HTMLButtonElement>("[data-testid=button-submit-enquiry]")!;
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  let resolveFetch: ((response: Response) => void) | undefined;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return new Promise<Response>((resolve) => {
+      resolveFetch = resolve;
+    });
+  };
+
+  try {
+    await act(async () => {
+      fillCompleteForm(rendered.container);
+    });
+
+    await act(async () => {
+      submitButton.focus();
+      submitWithKeyboard(form, submitButton);
+      submitWithKeyboard(form, submitButton);
+    });
+
+    assert.equal(requestCount, 1);
+    assert.equal(submitButton.disabled, true);
+    assert.equal(submitButton.textContent?.includes("Submitting..."), true);
+
+    await act(async () => {
+      resolveFetch?.(new Response(
+        JSON.stringify({
+          id: 42,
+          tutorName: "Alice Smith",
+          receivedAt: "2026-09-19T12:00:00.000Z",
+          deliveryStatus: "delivered",
+          message: "Your enquiry has been sent securely.",
+        }),
+        {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        },
+      ));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    assert.equal(rendered.container.querySelector("[data-testid=enquiry-success]") !== null, true);
+    assert.equal(requestCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await cleanupForm(rendered);
+  }
+});
+
 test("a failed submission keeps an announced form error and a successful retry focuses the receipt", async () => {
   const rendered = await renderForm();
   const form = rendered.container.querySelector<HTMLFormElement>("[data-testid=enquiry-form]")!;
