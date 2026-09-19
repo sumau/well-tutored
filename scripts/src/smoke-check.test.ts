@@ -21,6 +21,7 @@ type FailureCase = {
 
 type Fixture = {
   close: () => Promise<void>;
+  requests: string[];
   url: string;
 };
 
@@ -106,7 +107,9 @@ function writeHealthyResponse(
 }
 
 async function startFixture(testCase: FailureCase): Promise<Fixture> {
+  const requests: string[] = [];
   const server = createServer((request, response) => {
+    requests.push(`${request.method ?? "GET"} ${request.url ?? "/"}`);
     if (testCase.respond(request, response)) {
       return;
     }
@@ -119,6 +122,7 @@ async function startFixture(testCase: FailureCase): Promise<Fixture> {
 
   return {
     url: `http://127.0.0.1:${address.port}`,
+    requests,
     close: async () => {
       server.close();
       await once(server, "close");
@@ -287,6 +291,62 @@ test("SMOKE_BASE_URL remains an explicit override for published checks", async (
     const result = await runSmokeCommand(fixture.url, { published: true });
     assert.equal(result.exitCode, 0, result.output);
     assert.match(result.output, /Launch smoke check passed/);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("healthy launch checks pass entirely against the loopback fixture", async () => {
+  const fixture = await startFixture({
+    name: "healthy offline run",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url);
+    const expectedChecks = [
+      "/api/healthz",
+      "/api/__clerk/v1/environment",
+      "/api/tutors",
+      "/api/resources",
+      "/",
+      "/resources",
+      "/enquire",
+      "/tutors/ada-lovelace",
+      "/resources/learning-mathematics",
+      "POST /api/enquiries (invalid payload)",
+      "/api/healthz after invalid enquiry",
+    ];
+    const reportedChecks = [...result.output.matchAll(/^\s+✓ (.+)$/gm)].map(
+      ([, check]) => check,
+    );
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      new RegExp(
+        `Launch smoke check passed for ${fixture.url.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&",
+        )}`,
+      ),
+    );
+    assert.deepEqual(reportedChecks, expectedChecks, result.output);
+    assert.deepEqual(fixture.requests, [
+      "GET /api/healthz",
+      "GET /api/__clerk/v1/environment",
+      "GET /api/tutors",
+      "GET /api/resources",
+      "GET /",
+      "GET /resources",
+      "GET /enquire",
+      "GET /tutors/ada-lovelace",
+      "GET /resources/learning-mathematics",
+      "POST /api/enquiries",
+      "GET /api/healthz",
+    ]);
+    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
   } finally {
     await fixture.close();
   }
