@@ -162,22 +162,40 @@ fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
 from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
 `fly apps create` only reserves the name, which is all this repository needs.
 
-Then set `TRUSTED_ORIGINS` in `fly.toml` to the hostname you were allocated — it
-must match exactly, or every credentialed request is rejected, the public
-enquiry POST included — put the publishable key in `[build.args]`, and:
+Then edit two values in `fly.toml` itself. They are committed to the
+repository, which is correct for both:
+
+```toml
+[build.args]
+  # Your Clerk publishable key, pasted in full.
+  VITE_CLERK_PUBLISHABLE_KEY = "pk_test_..."
+
+[env]
+  # The hostname `fly apps create` gave you, with the scheme and no trailing
+  # slash.
+  TRUSTED_ORIGINS = "https://well-tutored.fly.dev"
+```
+
+**The publishable key has to be here and not in `fly secrets`.** Vite compiles
+it into the browser bundle while the image is being built, and a Fly secret only
+exists once the container is running — too late. Set it with `fly secrets set`
+and the build silently uses the empty string in `fly.toml`, the bundle ships
+without a Clerk key, and sign-in never initialises. Committing it is expected
+rather than a leak: a publishable key is public by design and is served to every
+visitor in the JavaScript. The three secrets above are the opposite case and
+must never appear in this file.
+
+**`TRUSTED_ORIGINS` must match the deployed hostname exactly.** A mismatch
+rejects every credentialed request, the public enquiry POST included, so the
+site looks fine until someone tries to use it.
+
+Then:
 
 ```
 fly deploy
 ```
 
 The health check is already pointed at `/api/healthz`.
-
-**`VITE_CLERK_PUBLISHABLE_KEY` must be a build argument, not a secret.** Vite
-compiles it into the browser bundle, and a Fly secret exists only at runtime, so
-setting it with `fly secrets set` leaves the bundle holding the empty string and
-sign-in never initialises. It is a publishable key — public by design, shipped
-to every visitor — so committing it to `fly.toml` is expected, not a leak. The
-other three belong in `fly secrets` and not in this file.
 
 ## Configuration reference
 
