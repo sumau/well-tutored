@@ -9,8 +9,9 @@ import { LoadingState } from "@/components/LoadingState";
 import { useToast } from "@/hooks/use-toast";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { ResourceTypeLabel } from "@/components/ResourceType";
+import { Toaster } from "@/components/ui/toaster";
 
-export default function ResourceDetail() {
+function ResourceDetailContent() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
   
@@ -226,5 +227,14 @@ export default function ResourceDetail() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function ResourceDetail() {
+  return (
+    <>
+      <ResourceDetailContent />
+      <Toaster />
+    </>
   );
 }

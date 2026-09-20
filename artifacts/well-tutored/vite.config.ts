@@ -1,7 +1,8 @@
 import path from 'path';
+import { mkdir, writeFile } from 'fs/promises';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -14,6 +15,54 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH ?? '/';
+
+function bundleReport(): Plugin {
+  let report: {
+    generatedAt: string;
+    chunks: Array<{
+      fileName: string;
+      size: number;
+      isEntry: boolean;
+      dynamicImports: string[];
+      imports: string[];
+      modules: Array<{
+        id: string;
+        originalLength: number;
+        renderedLength: number;
+      }>;
+    }>;
+  };
+
+  return {
+    name: 'well-tutored-bundle-report',
+    generateBundle(_options, bundle) {
+      const chunks = Object.values(bundle)
+        .filter((asset) => asset.type === 'chunk')
+        .map((chunk) => ({
+          fileName: chunk.fileName,
+          size: chunk.code.length,
+          isEntry: chunk.isEntry,
+          dynamicImports: chunk.dynamicImports,
+          imports: chunk.imports,
+          modules: Object.entries(chunk.modules)
+            .map(([id, module]) => ({
+              id,
+              originalLength: module.originalLength,
+              renderedLength: module.renderedLength,
+            }))
+            .sort((a, b) => b.renderedLength - a.renderedLength),
+        }))
+        .sort((a, b) => b.size - a.size);
+
+      report = { generatedAt: new Date().toISOString(), chunks };
+    },
+    async writeBundle() {
+      const reportPath = path.resolve(import.meta.dirname, 'dist/bundle-report.json');
+      await mkdir(path.dirname(reportPath), { recursive: true });
+      await writeFile(reportPath, JSON.stringify(report, null, 2));
+    },
+  };
+}
 
 export default defineConfig({
   base: basePath,
@@ -51,6 +100,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      plugins: [bundleReport()],
+    },
   },
   server: {
     port,
