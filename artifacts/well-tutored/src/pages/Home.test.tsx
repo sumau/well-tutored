@@ -150,7 +150,7 @@ test("keeps the homepage visible and offers retry when tutors fail to load", asy
   );
 
   await act(async () => {
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 25));
   });
 
   assert.ok(rendered.container.querySelector("[data-testid=hero-title]"));

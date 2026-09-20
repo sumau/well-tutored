@@ -4,6 +4,10 @@ import { Link } from "wouter";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import {
+  publicTutorQueryOptions,
+  publicTutorRequestOptions,
+} from "@/lib/public-tutor-query";
 
 export default function Enquiry() {
   const {
@@ -11,7 +15,10 @@ export default function Enquiry() {
     isLoading,
     error,
     refetch,
-  } = useListTutors();
+  } = useListTutors({
+    query: publicTutorQueryOptions,
+    request: publicTutorRequestOptions,
+  });
 
   if (isLoading) return <LoadingState message="Loading enquiry form..." />;
   if (error) {

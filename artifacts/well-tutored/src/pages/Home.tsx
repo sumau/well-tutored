@@ -4,6 +4,10 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import {
+  publicTutorQueryOptions,
+  publicTutorRequestOptions,
+} from "@/lib/public-tutor-query";
 
 const availabilityLabels = {
   accepting: "Available",
@@ -18,7 +22,10 @@ const availabilityDotClasses = {
 } as const;
 
 export default function Home() {
-  const { data: tutors, isLoading: tutorsLoading, error: tutorsError, refetch: refetchTutors } = useListTutors();
+  const { data: tutors, isLoading: tutorsLoading, error: tutorsError, refetch: refetchTutors } = useListTutors({
+    query: publicTutorQueryOptions,
+    request: publicTutorRequestOptions,
+  });
 
   const handleJump = (id: string) => {
     const target = document.getElementById(id);

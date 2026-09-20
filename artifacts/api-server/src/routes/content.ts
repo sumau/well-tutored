@@ -24,7 +24,10 @@ import { tutorNameFields } from "../lib/tutor-names";
 import { publicTutorSlug } from "../lib/tutor-slugs";
 import { normalizeTutorTint } from "../lib/tutor-accents";
 import { normalizeResourceType } from "../lib/resource-types";
-import { findPublishedTutor } from "../lib/public-tutors";
+import {
+  findPublishedTutor,
+  setPublicTutorCacheHeaders,
+} from "../lib/public-tutors";
 import { requireWorkspaceAccount } from "../auth/workspace-access";
 
 const router: IRouter = Router();
@@ -104,6 +107,7 @@ router.get("/tutors", async (_req, res): Promise<void> => {
       .map(toResource),
   }));
 
+  setPublicTutorCacheHeaders(res);
   res.json(ListTutorsResponse.parse(payload));
 });
 
@@ -122,6 +126,7 @@ router.get("/tutors/:slug", async (req, res): Promise<void> => {
   }
 
   const resources = await listJoinedResources();
+  setPublicTutorCacheHeaders(res);
   res.json(
     GetTutorResponse.parse({
       id: tutor.id,

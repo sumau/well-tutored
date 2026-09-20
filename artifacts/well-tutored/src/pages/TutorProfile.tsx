@@ -7,6 +7,10 @@ import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 import { EnquiryForm } from "@/components/EnquiryForm";
 import { ResourceTypeLabel } from "@/components/ResourceType";
+import {
+  publicTutorQueryOptions,
+  publicTutorRequestOptions,
+} from "@/lib/public-tutor-query";
 
 const availabilityDescriptions = {
   accepting: "Accepting enquiries",
@@ -27,7 +31,12 @@ export function TutorEnquiry({ tutor }: { tutor: Tutor }) {
 export default function TutorProfile() {
   const { slug } = useParams<{ slug: string }>();
   const { data: tutor, isLoading, error, refetch } = useGetTutor(slug as string, {
-    query: { enabled: !!slug, queryKey: getGetTutorQueryKey(slug as string) }
+    query: {
+      ...publicTutorQueryOptions,
+      enabled: !!slug,
+      queryKey: getGetTutorQueryKey(slug as string),
+    },
+    request: publicTutorRequestOptions,
   });
 
   const jumpTo = (id: string) => {

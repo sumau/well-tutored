@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
+import { invalidatePublicTutorQueries } from "@/lib/public-tutor-query";
 
 export default function WorkspaceTutorProfiles() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -95,13 +96,14 @@ export default function WorkspaceTutorProfiles() {
     });
   };
 
-  const handleArchive = (id: number) => {
+  const handleArchive = (id: number, slug: string) => {
     archiveTutor.mutate(
       { id },
       {
         onSuccess: () => {
           toast.success("Tutor profile archived");
           invalidateTutorLists();
+          invalidatePublicTutorQueries(queryClient, slug);
         },
         onError: () => {
           toast.error("Failed to archive tutor profile");
@@ -110,13 +112,14 @@ export default function WorkspaceTutorProfiles() {
     );
   };
 
-  const handleRestore = (id: number) => {
+  const handleRestore = (id: number, slug: string) => {
     restoreTutor.mutate(
       { id },
       {
         onSuccess: () => {
           toast.success("Tutor profile restored as a draft");
           invalidateTutorLists();
+          invalidatePublicTutorQueries(queryClient, slug);
         },
         onError: () => {
           toast.error("Failed to restore tutor profile");
@@ -419,8 +422,8 @@ export default function WorkspaceTutorProfiles() {
                                     }
                                     onClick={() =>
                                       tutor.profileStatus === "archived"
-                                        ? handleRestore(tutor.id)
-                                        : handleArchive(tutor.id)
+                                        ? handleRestore(tutor.id, tutor.slug)
+                                        : handleArchive(tutor.id, tutor.slug)
                                     }
                                     disabled={isLifecyclePending}
                                     data-testid={`${tutor.profileStatus === "archived" ? "button-confirm-restore" : "button-confirm-archive"}-tutor-profile-${tutor.id}`}

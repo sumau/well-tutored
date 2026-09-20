@@ -19,6 +19,7 @@ import {
 } from "@workspace/api-zod";
 import contentRouter from "./content";
 import workspaceRouter from "./workspace";
+import { PUBLIC_TUTOR_CACHE_CONTROL } from "../lib/public-tutors";
 
 const ownerUserId = "workspace-lifecycle-owner";
 const pendingUserId = "workspace-lifecycle-pending";
@@ -285,6 +286,10 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   const publicTutors = await request("/api/tutors");
   assert.equal(publicTutors.response.status, 200);
   assert.equal(
+    publicTutors.response.headers.get("cache-control"),
+    PUBLIC_TUTOR_CACHE_CONTROL,
+  );
+  assert.equal(
     publicTutors.body.some((tutor: { id: number }) => tutor.id === tutorId),
     false,
   );
@@ -383,6 +388,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     ownerUserId,
   );
   assert.equal(archivedWorkspaceTutors.response.status, 200);
+  assert.equal(archivedWorkspaceTutors.response.headers.get("cache-control"), null);
   assert.equal(
     archivedWorkspaceTutors.body.find(
       (tutor: { id: number }) => tutor.id === tutorId,
@@ -391,6 +397,10 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   );
 
   const publicTutorsAfterArchive = await request("/api/tutors");
+  assert.equal(
+    publicTutorsAfterArchive.response.headers.get("cache-control"),
+    PUBLIC_TUTOR_CACHE_CONTROL,
+  );
   assert.equal(
     publicTutorsAfterArchive.body.some(
       (tutor: { id: number }) => tutor.id === tutorId,
@@ -486,6 +496,13 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   );
   assert.equal(publishedProfile.response.status, 200);
   assert.equal(publishedProfile.body.profileStatus, "published");
+
+  const publicTutorProfile = await request("/api/tutors/lifecycle-tutor");
+  assert.equal(publicTutorProfile.response.status, 200);
+  assert.equal(
+    publicTutorProfile.response.headers.get("cache-control"),
+    PUBLIC_TUTOR_CACHE_CONTROL,
+  );
 
   const draftAfterPublish = await request(
     "/api/workspace/profile",

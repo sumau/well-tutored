@@ -26,6 +26,7 @@ import {
   TUTOR_ACCENT_VALUES,
 } from "@/lib/tutor-accents";
 import { cn } from "@/lib/utils";
+import { invalidatePublicTutorQueries } from "@/lib/public-tutor-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,7 +176,10 @@ export default function WorkspaceProfile() {
               old ? { ...old, tutor: updatedTutor } : old,
             );
             if (statusOverride === "published") {
-              queryClient.invalidateQueries({ queryKey: getGetTutorQueryKey(updatedTutor.slug) });
+              invalidatePublicTutorQueries(queryClient, [
+                session?.tutor?.slug,
+                updatedTutor.slug,
+              ]);
             }
             form.reset(form.getValues());
             setSaveFeedback("saved");
