@@ -16,6 +16,8 @@ repository root.
 - Incorrect environment-variable instructions
 - Contradictions between documentation files
 - Important behavior that is not documented
+- Duplication across documentation files
+- Documentation that is too detailed
 
 ## Ignore
 
@@ -91,4 +93,4 @@ environment variables, and operating procedures.
 ```
 
 Include verified documentation paths and codebase evidence inline under each
-finding. Never include a separate Relevant files section.
+finding.
