@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect } from "react";
-import { Redirect, Route, Switch, useLocation, useParams } from "wouter";
-import { Show } from "@clerk/react";
+import { lazy, Suspense, type ReactNode } from "react";
+import { Redirect, Route, Switch, useParams } from "wouter";
+import { Show, useAuth } from "@clerk/react";
 import { Shell } from "@/components/layout/Shell";
 import { WorkspaceLayout } from "@/components/layout/WorkspaceLayout";
 import { WorkspaceAuthBoundary } from "@/components/layout/WorkspaceAuthBoundary";
@@ -8,16 +8,11 @@ import { LoadingState } from "@/components/LoadingState";
 import NotFound from "@/pages/not-found";
 import {
   legacyWorkspaceResourcePath,
-  routeMetadataForPath,
   routePaths,
   workspaceSignedOutRedirect,
 } from "./route-map";
+import { RouteMeta } from "./RouteMeta";
 
-const Home = lazy(() => import("@/pages/Home"));
-const TutorProfile = lazy(() => import("@/pages/TutorProfile"));
-const Resources = lazy(() => import("@/pages/Resources"));
-const ResourceDetail = lazy(() => import("@/pages/ResourceDetail"));
-const Enquiry = lazy(() => import("@/pages/Enquiry"));
 const SignInPage = lazy(() => import("@/pages/auth/sign-in"));
 const SignUpPage = lazy(() => import("@/pages/auth/sign-up"));
 const WorkspaceDashboard = lazy(() => import("@/pages/workspace/dashboard"));
@@ -29,27 +24,6 @@ const WorkspaceProfile = lazy(() => import("@/pages/workspace/profile"));
 
 function RouteLoading({ message }: { message: string }) {
   return <LoadingState message={message} />;
-}
-
-function RouteMeta() {
-  const [location] = useLocation();
-
-  useEffect(() => {
-    const { title, description } = routeMetadataForPath(location);
-
-    document.title = title;
-    for (const [selector, content] of [
-      ["meta[name=\"description\"]", description],
-      ["meta[property=\"og:title\"]", title],
-      ["meta[property=\"og:description\"]", description],
-      ["meta[name=\"twitter:title\"]", title],
-      ["meta[name=\"twitter:description\"]", description],
-    ]) {
-      document.querySelector<HTMLMetaElement>(selector)?.setAttribute("content", content);
-    }
-  }, [location]);
-
-  return null;
 }
 
 function LegacyWorkspaceResourceRedirect() {
@@ -89,27 +63,27 @@ function WorkspaceRoutes() {
   );
 }
 
-export function AppRoutes() {
+function AuthenticatedShell({ children }: { children: ReactNode }) {
+  const { isSignedIn } = useAuth();
+  return <Shell isSignedIn={Boolean(isSignedIn)}>{children}</Shell>;
+}
+
+export default function AuthenticatedRoutes() {
   return (
     <>
       <RouteMeta />
       <Switch>
         <Route path={routePaths.workspace.wildcard} component={WorkspaceRoutes} />
         <Route>
-          <Shell>
+          <AuthenticatedShell>
             <Suspense fallback={<RouteLoading message="Loading page..." />}>
               <Switch>
-                <Route path={routePaths.public.home} component={Home} />
-                <Route path={routePaths.public.tutorProfile} component={TutorProfile} />
-                <Route path={routePaths.public.resources} component={Resources} />
-                <Route path={routePaths.public.resourceDetail} component={ResourceDetail} />
-                <Route path={routePaths.public.enquiry} component={Enquiry} />
                 <Route path={routePaths.auth.signIn} component={SignInPage} />
                 <Route path={routePaths.auth.signUp} component={SignUpPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
-          </Shell>
+          </AuthenticatedShell>
         </Route>
       </Switch>
     </>

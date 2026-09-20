@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  useListResources,
-  useListSavedResources,
-} from "@workspace/api-client-react";
-import { useAuth } from "@clerk/react";
+import { useListResources } from "@workspace/api-client-react";
 import { Search } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -20,7 +16,6 @@ const FILTERS = [
 ];
 
 export default function Resources() {
-  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const [filter, setFilter] = useState("All resources");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -34,37 +29,18 @@ export default function Resources() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  const showingSaved = filter === "Saved";
-  const subject =
-    filter === "All resources" || showingSaved ? undefined : filter;
+  const subject = filter === "All resources" ? undefined : filter;
   const { data, isLoading, isFetching, error, refetch } = useListResources({
     subject,
     query: debouncedQuery || undefined,
     page,
     pageSize: 9,
-  }, {
-    query: { enabled: !showingSaved },
   });
-  const {
-    data: savedResources,
-    isLoading: savedIsLoading,
-    isFetching: savedIsFetching,
-    error: savedError,
-    refetch: refetchSaved,
-  } = useListSavedResources({
-    query: { enabled: Boolean(isAuthLoaded && isSignedIn && showingSaved) },
-  });
-  const visible = showingSaved
-    ? (savedResources ?? []).filter((resource) =>
-        `${resource.title} ${resource.tutorName} ${resource.subject} ${resource.excerpt}`
-          .toLowerCase()
-          .includes(debouncedQuery.toLowerCase()),
-      )
-    : data?.items ?? [];
-  const loading = showingSaved ? savedIsLoading : isLoading;
-  const fetching = showingSaved ? savedIsFetching : isFetching;
-  const loadError = showingSaved ? savedError : error;
-  const retry = showingSaved ? refetchSaved : refetch;
+  const visible = data?.items ?? [];
+  const loading = isLoading;
+  const fetching = isFetching;
+  const loadError = error;
+  const retry = refetch;
 
   const selectFilter = (nextFilter: string) => {
     setFilter(nextFilter);
@@ -128,7 +104,7 @@ export default function Resources() {
             role="group"
             aria-label="Filter by resource type"
           >
-            {[...FILTERS, ...(isSignedIn ? ["Saved"] : [])].map((item) => (
+            {FILTERS.map((item) => (
               <button
                 key={item}
                 className={`border px-[12px] py-[9px] text-[11px] transition-colors font-medium ${
@@ -182,7 +158,7 @@ export default function Resources() {
                   />
                 ))}
               </div>
-              {!showingSaved && (page > 1 || data?.hasMore) && (
+              {(page > 1 || data?.hasMore) && (
                 <nav
                   className="mt-10 flex items-center justify-between border-t border-border pt-6"
                   aria-label="Resource pages"
@@ -213,11 +189,7 @@ export default function Resources() {
           ) : (
             <EmptyState
               title="No resources found"
-              message={
-                showingSaved
-                  ? "Resources you save for later will appear here."
-                  : "Try adjusting your filter or search term to see more resources."
-              }
+              message="Try adjusting your filter or search term to see more resources."
             />
           )}
         </div>

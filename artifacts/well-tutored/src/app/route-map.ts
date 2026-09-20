@@ -76,6 +76,18 @@ export function workspaceSignedOutRedirect() {
   return routePaths.auth.signIn.replace("/*?", "");
 }
 
+export function isAuthenticatedPath(pathname: string) {
+  const path = pathname.split(/[?#]/, 1)[0];
+  return (
+    path === routePaths.workspace.root ||
+    path.startsWith("/workspace/") ||
+    path === "/sign-in" ||
+    path.startsWith("/sign-in/") ||
+    path === "/sign-up" ||
+    path.startsWith("/sign-up/")
+  );
+}
+
 export type RouteMetadata = {
   title: string;
   description: string;

@@ -2,12 +2,16 @@ import { ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Menu, X, ShieldCheck, PenTool } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@clerk/react";
 
-export function Shell({ children }: { children: ReactNode }) {
+export function Shell({
+  children,
+  isSignedIn,
+}: {
+  children: ReactNode;
+  isSignedIn: boolean;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [policy, setPolicy] = useState<"safeguarding" | "privacy" | null>(null);
-  const { isSignedIn } = useAuth();
 
   const closeMenu = () => setMenuOpen(false);
 

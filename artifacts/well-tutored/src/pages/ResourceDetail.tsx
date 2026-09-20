@@ -1,16 +1,9 @@
 import { useParams, Link } from "wouter";
 import {
   getGetResourceQueryKey,
-  getListSavedResourcesQueryKey,
   useGetResource,
-  useListSavedResources,
-  useSaveResource,
-  useUnsaveResource,
 } from "@workspace/api-client-react";
-import { useAuth } from "@clerk/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Bookmark, Clock3, List, Printer, Share2 } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Clock3, List, Printer, Share2 } from "lucide-react";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 import { useToast } from "@/hooks/use-toast";
@@ -20,62 +13,12 @@ import { ResourceTypeLabel } from "@/components/ResourceType";
 export default function ResourceDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
-  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
-  const queryClient = useQueryClient();
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   
   const { data: resource, isLoading, error, refetch } = useGetResource(slug as string, {
     query: { enabled: !!slug, queryKey: getGetResourceQueryKey(slug as string) }
   });
 
-  const { data: savedResources } = useListSavedResources({
-    query: { enabled: Boolean(isAuthLoaded && isSignedIn) }
-  });
-
-  const saved = Boolean(
-    resource && savedResources?.some((item) => item.id === resource.id),
-  );
   const related = resource?.related ?? [];
-  const saveResource = useSaveResource({
-    mutation: {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: getListSavedResourcesQueryKey(),
-        });
-        toast({
-          title: "Saved for later",
-          description: "This resource is now in your saved list.",
-        });
-      },
-      onError: () => {
-        toast({
-          title: "Could not save resource",
-          description: "Please try again.",
-          variant: "destructive",
-        });
-      },
-    },
-  });
-  const unsaveResource = useUnsaveResource({
-    mutation: {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: getListSavedResourcesQueryKey(),
-        });
-        toast({
-          title: "Removed from saved",
-          description: "This resource is no longer in your saved list.",
-        });
-      },
-      onError: () => {
-        toast({
-          title: "Could not update saved resources",
-          description: "Please try again.",
-          variant: "destructive",
-        });
-      },
-    },
-  });
 
   const handleShare = async () => {
     try {
@@ -99,20 +42,6 @@ export default function ResourceDetail() {
         description: "Copy the page address from your browser and try again.",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleSave = () => {
-    if (!resource) return;
-    if (!isSignedIn) {
-      setShowSignInPrompt(true);
-      return;
-    }
-    setShowSignInPrompt(false);
-    if (saved) {
-      unsaveResource.mutate({ id: resource.id });
-    } else {
-      saveResource.mutate({ id: resource.id });
     }
   };
 
@@ -166,38 +95,12 @@ export default function ResourceDetail() {
             
             <div className="flex gap-[9px] items-center flex-wrap my-[25px]">
               <button 
-                onClick={handleSave}
-                disabled={
-                  !isAuthLoaded ||
-                  saveResource.isPending ||
-                  unsaveResource.isPending
-                }
-                aria-pressed={isSignedIn ? saved : undefined}
-                className={`border px-[13px] py-[11px] inline-flex items-center gap-[8px] text-[12px] font-medium transition-colors ${
-                  saved ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground hover:bg-foreground hover:text-background"
-                } disabled:cursor-wait disabled:opacity-60`}
-              >
-                <Bookmark size={14} className={saved ? "fill-current" : ""} /> {saved ? "Saved" : "Save"}
-              </button>
-              <button 
                 onClick={handleShare}
                 className="border border-border px-[13px] py-[11px] inline-flex items-center gap-[8px] text-[12px] font-medium hover:border-foreground hover:bg-foreground hover:text-background transition-colors"
               >
                 <Share2 size={14} /> Share
               </button>
             </div>
-            {showSignInPrompt && !isSignedIn && (
-              <p className="mb-[20px] text-[11px] leading-[1.6]" role="status">
-                <Link
-                  href={`/sign-in?next=${encodeURIComponent(`/resources/${resource.slug}`)}`}
-                  className="font-bold text-primary underline underline-offset-4"
-                >
-                  Sign in
-                </Link>{" "}
-                to save this resource across devices.
-              </p>
-            )}
-            
             <div className="flex items-center gap-[9px] pt-[18px] border-t border-border text-[11px] flex-wrap">
               <button onClick={() => window.print()} className="inline-flex items-center gap-[6px] hover:text-primary transition-colors">
                 <Printer size={13} /> Print or save PDF

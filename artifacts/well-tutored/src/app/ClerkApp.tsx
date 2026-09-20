@@ -1,21 +1,10 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ClerkProvider, useClerk } from "@clerk/react";
 import { shadcn } from "@clerk/themes";
 import { useLocation } from "wouter";
-import { ErrorBoundary } from "@/components/error-boundary";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import "@clerk/themes/shadcn.css";
 import { basePath, clerkProxyUrl, clerkPubKey, stripBase } from "./config";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
@@ -109,13 +98,8 @@ export function ClerkApp({ children }: { children: ReactNode }) {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
-        <TooltipProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ClerkQueryClientCacheInvalidator />
+      {children}
     </ClerkProvider>
   );
 }

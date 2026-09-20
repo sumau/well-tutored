@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   authRouteDefinitions,
+  isAuthenticatedPath,
   legacyWorkspaceResourcePath,
   publicRouteDefinitions,
   routeMetadataForPath,
@@ -105,6 +106,15 @@ test("redirects signed-out users away from every workspace path", () => {
     kind: "redirect",
     to: "/sign-in",
   });
+});
+
+test("keeps Clerk behind authentication and workspace paths", () => {
+  assert.equal(isAuthenticatedPath("/"), false);
+  assert.equal(isAuthenticatedPath("/resources/essay-planning"), false);
+  assert.equal(isAuthenticatedPath("/sign-in"), true);
+  assert.equal(isAuthenticatedPath("/sign-in/sso-callback?redirect_url=%2Fworkspace"), true);
+  assert.equal(isAuthenticatedPath("/workspace/profile"), true);
+  assert.equal(isAuthenticatedPath("/workspace?tab=resources"), true);
 });
 
 test("resolves signed-in workspace pages and legacy resource redirects", () => {
