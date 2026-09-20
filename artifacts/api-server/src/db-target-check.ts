@@ -2,8 +2,8 @@ import { pool } from "@workspace/db";
 
 try {
   const result = await pool.query<{
-    databaseName: string;
-    schemaName: string;
+    database_name: string;
+    schema_name: string;
   }>(
     "SELECT current_database() AS database_name, current_schema() AS schema_name",
   );
@@ -14,7 +14,7 @@ try {
   }
 
   console.log(
-    `[deploy-db-check] database=${identity.databaseName} schema=${identity.schemaName}`,
+    `[deploy-db-check] database=${identity.database_name} schema=${identity.schema_name}`,
   );
 } finally {
   await pool.end();
