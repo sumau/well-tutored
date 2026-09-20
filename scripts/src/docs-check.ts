@@ -1,0 +1,249 @@
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ignoredDirectories = new Set([
+  ".agents",
+  ".cache",
+  ".git",
+  ".local",
+  "attached_assets",
+  "dist",
+  "node_modules",
+]);
+
+export type DocumentationCommand = {
+  filePath: string;
+  lineNumber: number;
+  command: string;
+};
+
+export type PackageManifest = {
+  name?: string;
+  scripts?: Record<string, string>;
+};
+
+export type PackageManifestRecord = {
+  filePath: string;
+  manifest: PackageManifest;
+};
+
+export type DocumentationCheckResult = {
+  commands: DocumentationCommand[];
+  errors: string[];
+};
+
+function walkFiles(directory: string, fileName?: string): string[] {
+  if (!existsSync(directory)) return [];
+
+  const files: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (ignoredDirectories.has(entry.name)) continue;
+      files.push(...walkFiles(join(directory, entry.name), fileName));
+      continue;
+    }
+    if (entry.isFile() && (!fileName || entry.name === fileName)) {
+      files.push(join(directory, entry.name));
+    }
+  }
+  return files;
+}
+
+function documentationFiles(rootDir: string): string[] {
+  const files = [
+    ...(existsSync(join(rootDir, "replit.md")) ? [join(rootDir, "replit.md")] : []),
+    ...walkFiles(join(rootDir, "docs")),
+  ];
+
+  return files
+    .filter((filePath) => filePath === join(rootDir, "replit.md") || filePath.endsWith(".md"))
+    .sort();
+}
+
+function extractCommandFromLine(line: string, inCodeFence: boolean): string | undefined {
+  const pnpmIndex = line.indexOf("pnpm");
+  if (pnpmIndex < 0) return undefined;
+
+  const isInlineCode = line.slice(0, pnpmIndex).includes("`");
+  if (!inCodeFence && !isInlineCode) return undefined;
+
+  const command = line
+    .slice(pnpmIndex)
+    .split("`", 1)[0]
+    .split(" —", 1)[0]
+    .split(" #", 1)[0]
+    .trim()
+    .replace(/[.,;:]$/, "");
+
+  return command.startsWith("pnpm ") ? command : undefined;
+}
+
+export function extractDocumentedCommands(
+  markdown: string,
+  filePath: string,
+): DocumentationCommand[] {
+  const commands: DocumentationCommand[] = [];
+  let inCodeFence = false;
+
+  for (const [index, line] of markdown.split(/\r?\n/).entries()) {
+    if (line.trimStart().startsWith("```")) {
+      inCodeFence = !inCodeFence;
+      continue;
+    }
+
+    const command = extractCommandFromLine(line, inCodeFence);
+    if (command) {
+      commands.push({
+        filePath,
+        lineNumber: index + 1,
+        command,
+      });
+    }
+  }
+
+  return commands;
+}
+
+function readPackageManifests(rootDir: string): PackageManifestRecord[] {
+  const packagePaths = new Set<string>([
+    join(rootDir, "package.json"),
+    ...walkFiles(join(rootDir, "artifacts"), "package.json"),
+    ...walkFiles(join(rootDir, "lib"), "package.json"),
+    ...walkFiles(join(rootDir, "scripts"), "package.json"),
+  ]);
+
+  return [...packagePaths]
+    .filter((filePath) => existsSync(filePath))
+    .sort()
+    .map((filePath) => ({
+      filePath,
+      manifest: JSON.parse(readFileSync(filePath, "utf8")) as PackageManifest,
+    }));
+}
+
+function packageForFilter(
+  filter: string | undefined,
+  manifests: PackageManifestRecord[],
+): PackageManifestRecord | undefined {
+  if (!filter) {
+    return manifests.find(
+      ({ filePath, manifest }) =>
+        filePath === "package.json" ||
+        manifest.name === "workspace" ||
+        manifest.name === undefined,
+    );
+  }
+  return manifests.find(({ manifest }) => manifest.name === filter);
+}
+
+function parseScriptReference(command: string): {
+  filter?: string;
+  script?: string;
+  unsupported?: string;
+} {
+  const tokens = command.match(/(?:"[^"]*"|'[^']*'|\S+)/g)?.map((token) =>
+    token.replace(/^['"]|['"]$/g, ""),
+  ) ?? [];
+
+  let index = 1;
+  let filter: string | undefined;
+  if (tokens[index] === "--filter") {
+    filter = tokens[index + 1];
+    index += 2;
+  } else if (tokens[index]?.startsWith("--filter=")) {
+    filter = tokens[index].slice("--filter=".length);
+    index += 1;
+  }
+
+  if (!tokens[index]) {
+    return { filter, unsupported: "no script name" };
+  }
+  if (tokens[index] === "run") {
+    return {
+      filter,
+      script: tokens[index + 1],
+      ...(tokens[index + 1] ? {} : { unsupported: "no script name after run" }),
+    };
+  }
+
+  if (tokens[index].startsWith("-")) {
+    return { filter, unsupported: `unsupported pnpm option "${tokens[index]}"` };
+  }
+
+  return { filter, script: tokens[index] };
+}
+
+export function validateDocumentedCommands(
+  commands: DocumentationCommand[],
+  manifests: PackageManifestRecord[],
+): string[] {
+  const errors: string[] = [];
+
+  for (const documented of commands) {
+    const reference = parseScriptReference(documented.command);
+    const location = `${documented.filePath}:${documented.lineNumber}`;
+    if (reference.unsupported) {
+      errors.push(
+        `${location}: "${documented.command}" has ${reference.unsupported}.`,
+      );
+      continue;
+    }
+
+    const packageRecord = packageForFilter(reference.filter, manifests);
+    if (!packageRecord) {
+      errors.push(
+        `${location}: "${documented.command}" references package ` +
+          `"${reference.filter ?? "the root package"}", but that package was not found.`,
+      );
+      continue;
+    }
+
+    if (!reference.script || !packageRecord.manifest.scripts?.[reference.script]) {
+      errors.push(
+        `${location}: "${documented.command}" references script ` +
+          `"${reference.script ?? "(missing)"}" in ` +
+          `"${packageRecord.manifest.name ?? packageRecord.filePath}", but that script was not found.`,
+      );
+    }
+  }
+
+  return errors;
+}
+
+export function checkDocumentation(rootDir: string): DocumentationCheckResult {
+  const commands = documentationFiles(rootDir).flatMap((filePath) =>
+    extractDocumentedCommands(
+      readFileSync(filePath, "utf8"),
+      relative(rootDir, filePath),
+    ),
+  );
+  const manifests = readPackageManifests(rootDir);
+
+  return {
+    commands,
+    errors: validateDocumentedCommands(commands, manifests),
+  };
+}
+
+function repositoryRoot(): string {
+  return resolve(fileURLToPath(new URL("../..", import.meta.url)));
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  const result = checkDocumentation(repositoryRoot());
+  if (result.errors.length > 0) {
+    console.error("Documentation command check failed:");
+    for (const error of result.errors) console.error(`- ${error}`);
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `Documentation command check passed (${result.commands.length} commands checked).`,
+    );
+  }
+}

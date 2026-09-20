@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "docs:check": "tsx ./src/docs-check.ts",
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
     "smoke:published:lifecycle": "tsx ./src/publish-smoke.ts",
