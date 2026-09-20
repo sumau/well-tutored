@@ -1,29 +1,35 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Redirect, Route, Switch, useLocation, useParams } from "wouter";
 import { Show } from "@clerk/react";
 import { Shell } from "@/components/layout/Shell";
 import { WorkspaceLayout } from "@/components/layout/WorkspaceLayout";
 import { WorkspaceAuthBoundary } from "@/components/layout/WorkspaceAuthBoundary";
-import Home from "@/pages/Home";
-import TutorProfile from "@/pages/TutorProfile";
-import Resources from "@/pages/Resources";
-import ResourceDetail from "@/pages/ResourceDetail";
-import Enquiry from "@/pages/Enquiry";
+import { LoadingState } from "@/components/LoadingState";
 import NotFound from "@/pages/not-found";
-import SignInPage from "@/pages/auth/sign-in";
-import SignUpPage from "@/pages/auth/sign-up";
-import WorkspaceDashboard from "@/pages/workspace/dashboard";
-import WorkspaceEnquiries from "@/pages/workspace/enquiries";
-import WorkspaceAccounts from "@/pages/workspace/accounts";
-import WorkspaceTutorProfiles from "@/pages/workspace/tutor-profiles";
-import WorkspaceResourceEditor from "@/pages/workspace/resource-editor";
-import WorkspaceProfile from "@/pages/workspace/profile";
 import {
   legacyWorkspaceResourcePath,
   routeMetadataForPath,
   routePaths,
   workspaceSignedOutRedirect,
 } from "./route-map";
+
+const Home = lazy(() => import("@/pages/Home"));
+const TutorProfile = lazy(() => import("@/pages/TutorProfile"));
+const Resources = lazy(() => import("@/pages/Resources"));
+const ResourceDetail = lazy(() => import("@/pages/ResourceDetail"));
+const Enquiry = lazy(() => import("@/pages/Enquiry"));
+const SignInPage = lazy(() => import("@/pages/auth/sign-in"));
+const SignUpPage = lazy(() => import("@/pages/auth/sign-up"));
+const WorkspaceDashboard = lazy(() => import("@/pages/workspace/dashboard"));
+const WorkspaceEnquiries = lazy(() => import("@/pages/workspace/enquiries"));
+const WorkspaceAccounts = lazy(() => import("@/pages/workspace/accounts"));
+const WorkspaceTutorProfiles = lazy(() => import("@/pages/workspace/tutor-profiles"));
+const WorkspaceResourceEditor = lazy(() => import("@/pages/workspace/resource-editor"));
+const WorkspaceProfile = lazy(() => import("@/pages/workspace/profile"));
+
+function RouteLoading({ message }: { message: string }) {
+  return <LoadingState message={message} />;
+}
 
 function RouteMeta() {
   const [location] = useLocation();
@@ -59,18 +65,20 @@ function WorkspaceRoutes() {
       <Show when="signed-in">
         <WorkspaceLayout>
           <WorkspaceAuthBoundary>
-            <Switch>
-              <Route path={routePaths.workspace.root} component={WorkspaceDashboard} />
-              <Route path={routePaths.workspace.enquiries} component={WorkspaceEnquiries} />
-              <Route path={routePaths.workspace.accounts} component={WorkspaceAccounts} />
-              <Route path={routePaths.workspace.tutors} component={WorkspaceTutorProfiles} />
-              <Route path={routePaths.workspace.profile} component={WorkspaceProfile} />
-              <Route path={routePaths.workspace.resourceNew} component={WorkspaceResourceEditor} />
-              <Route path={routePaths.workspace.resource} component={WorkspaceResourceEditor} />
-              <Route path={routePaths.workspace.legacyResourceNew} component={LegacyWorkspaceResourceRedirect} />
-              <Route path={routePaths.workspace.legacyResource} component={LegacyWorkspaceResourceRedirect} />
-              <Route component={NotFound} />
-            </Switch>
+            <Suspense fallback={<RouteLoading message="Loading workspace..." />}>
+              <Switch>
+                <Route path={routePaths.workspace.root} component={WorkspaceDashboard} />
+                <Route path={routePaths.workspace.enquiries} component={WorkspaceEnquiries} />
+                <Route path={routePaths.workspace.accounts} component={WorkspaceAccounts} />
+                <Route path={routePaths.workspace.tutors} component={WorkspaceTutorProfiles} />
+                <Route path={routePaths.workspace.profile} component={WorkspaceProfile} />
+                <Route path={routePaths.workspace.resourceNew} component={WorkspaceResourceEditor} />
+                <Route path={routePaths.workspace.resource} component={WorkspaceResourceEditor} />
+                <Route path={routePaths.workspace.legacyResourceNew} component={LegacyWorkspaceResourceRedirect} />
+                <Route path={routePaths.workspace.legacyResource} component={LegacyWorkspaceResourceRedirect} />
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
           </WorkspaceAuthBoundary>
         </WorkspaceLayout>
       </Show>
@@ -89,16 +97,18 @@ export function AppRoutes() {
         <Route path={routePaths.workspace.wildcard} component={WorkspaceRoutes} />
         <Route>
           <Shell>
-            <Switch>
-              <Route path={routePaths.public.home} component={Home} />
-              <Route path={routePaths.public.tutorProfile} component={TutorProfile} />
-              <Route path={routePaths.public.resources} component={Resources} />
-              <Route path={routePaths.public.resourceDetail} component={ResourceDetail} />
-              <Route path={routePaths.public.enquiry} component={Enquiry} />
-              <Route path={routePaths.auth.signIn} component={SignInPage} />
-              <Route path={routePaths.auth.signUp} component={SignUpPage} />
-              <Route component={NotFound} />
-            </Switch>
+            <Suspense fallback={<RouteLoading message="Loading page..." />}>
+              <Switch>
+                <Route path={routePaths.public.home} component={Home} />
+                <Route path={routePaths.public.tutorProfile} component={TutorProfile} />
+                <Route path={routePaths.public.resources} component={Resources} />
+                <Route path={routePaths.public.resourceDetail} component={ResourceDetail} />
+                <Route path={routePaths.public.enquiry} component={Enquiry} />
+                <Route path={routePaths.auth.signIn} component={SignInPage} />
+                <Route path={routePaths.auth.signUp} component={SignUpPage} />
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
           </Shell>
         </Route>
       </Switch>
