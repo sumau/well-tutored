@@ -28,6 +28,13 @@ with `pnpm run verify:ci`. The registration is workspace-level configuration,
 not a file committed to this repository, so keep `verify:ci` in the root
 `package.json` as the source-controlled definition of the check.
 
+The root deployment configuration also runs `pnpm run verify:ci` as the
+deployment build step before the artifact-specific production builds. A
+non-zero result stops the publish before the new build can go live. Because
+`verify:ci` includes `pnpm run build`, the artifact build may run again during
+the normal production build phase; this trades some build time for using the
+same complete verification command locally and during publishing.
+
 ## Development smoke validation
 
 After the API and web development workflows are running, validate the
