@@ -138,11 +138,12 @@ browser check does not create a real enquiry.
 
 In the Replit Workflows view, this repository assigns the Run button to the
 `Project` workflow. `Project` runs `ci` and `dev-smoke` as child workflows in
-parallel, along with the API and web services. The nested `dev-smoke` row may
-appear greyed out and may not be independently runnable from that view. Run
-the `Project` workflow and inspect the `dev-smoke` output, or run the two
-commands above directly from the shell when only the development smoke checks
-are needed.
+parallel. The API and web services are separate artifact-managed workflows and
+must already be running before the smoke checks are started. The nested
+`dev-smoke` row may appear greyed out and may not be independently runnable
+from that view. Run the `Project` workflow and inspect the `dev-smoke` output,
+or run the two commands above directly from the shell when only the
+development smoke checks are needed.
 
 ## Recommended verification sequence
 

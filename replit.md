@@ -4,7 +4,8 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server
+- `PORT=8080 pnpm --filter @workspace/api-server run dev` — run the API server
+  directly outside the managed artifact workflow
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
