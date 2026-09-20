@@ -1,9 +1,11 @@
 # Fly.io deployment for Well Tutored. One machine serving the frontend and the
-# API from a single origin, plus a managed PostgreSQL. See docs/deploy.md for
-# the full walkthrough, including the secrets this file deliberately omits.
+# API from a single origin. The database is external and reached through the
+# DATABASE_URL secret. See docs/deploy.md for the full walkthrough, including
+# the secrets this file deliberately omits.
 #
-# `fly launch` will rewrite `app` to whatever name it allocates. Update
-# TRUSTED_ORIGINS to match the hostname it gives you.
+# Create the app with `fly apps create`, which only reserves the name; `fly
+# launch` rewrites this file from its own guesses. Update `app` and
+# TRUSTED_ORIGINS together — they must name the same hostname.
 
 app = "well-tutored"
 primary_region = "lhr"

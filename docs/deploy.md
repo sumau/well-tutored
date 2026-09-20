@@ -41,12 +41,26 @@ host — see **Choosing a database** below.
 | `CLERK_PUBLISHABLE_KEY` | runtime | Used by the Clerk middleware. |
 | `VITE_CLERK_PUBLISHABLE_KEY` | **build**, as a build argument | Compiled into the browser bundle. Setting it at runtime has no effect. |
 
-`TRUSTED_ORIGINS` is the one that bites. On Replit, `getTrustedOrigins` falls
-back to `REPLIT_DOMAINS`; off Replit that variable does not exist, and an empty
-trusted-origin set rejects every credentialed request — including the public
-enquiry POST, which is the main thing visitors do. Set it to the public origin,
-with no trailing path, and update it when the domain changes. `APP_ORIGIN` works
-as an alias.
+`TRUSTED_ORIGINS` is the one that bites. On Replit, and only when
+`NODE_ENV=production`, `getTrustedOrigins` falls back to `REPLIT_DOMAINS`; off
+Replit that variable does not exist, and an empty trusted-origin set rejects
+every credentialed request — including the public enquiry POST, which is the
+main thing visitors do. Set it to the public origin, with no trailing path, and
+update it when the domain changes.
+
+`configuredValues` in `artifacts/api-server/src/middlewares/request-origin.ts`
+reads several names, and they are not interchangeable:
+
+- `TRUSTED_ORIGINS` and `CORS_ORIGINS` are the explicit tier. Either one being
+  set **replaces** everything below, so the deployment fails closed rather than
+  silently widening access.
+- `APP_ORIGIN`, `PUBLIC_APP_ORIGIN` and `PUBLIC_APP_URL` are consulted only when
+  neither of those is set. They are a fallback, not an alias: set
+  `TRUSTED_ORIGINS` as well and these are ignored entirely.
+- `REPLIT_DOMAINS` (production) and `REPLIT_DEV_DOMAIN` plus the localhost
+  defaults (everywhere else) sit below those again.
+
+Set `TRUSTED_ORIGINS` and ignore the rest.
 
 The public site does not need *working* Clerk keys, but it does need
 `CLERK_SECRET_KEY` to be present — see the table. With a placeholder, the
