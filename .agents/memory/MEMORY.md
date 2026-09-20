@@ -8,3 +8,4 @@
 - [Development smoke checks](development-smoke-checks.md) — dev Clerk proxying is intentionally disabled, so dev smoke must use explicit target mode and skip only that production assertion.
 - [Deployment build database target](deployment-build-database-target.md) — this project's deployment pre-build command receives the production PostgreSQL database.
 - [Clean integration fixtures](clean-integration-fixtures.md) — lifecycle tests must create every baseline row they assert against; isolated databases do not contain application seed data.
+- [PostgreSQL data snapshots](postgres-data-snapshots.md) — raw pg_dump output is not stable enough for before/after mutation checks; hash normalized catalog-derived row summaries instead.
