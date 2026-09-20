@@ -4,3 +4,4 @@
 - [Web artifact component tests](web-artifact-component-tests.md) — run tsx tests with the web app tsconfig when importing @ aliases and JSX components.
 - [Mutation submission races](mutation-submission-races.md) — use a synchronous in-flight latch when repeated events can arrive before React mutation state rerenders.
 - [Public/auth startup boundary](public-auth-boundary.md) — keep public route modules Clerk-free and defer auth/workspace code behind path-based lazy loading.
+- [JSDOM page test harness](jsdom-page-test-harness.md) — install global location/history/event listeners when rendering Wouter pages with tsx and JSDOM.

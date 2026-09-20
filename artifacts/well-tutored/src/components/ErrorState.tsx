@@ -1,3 +1,4 @@
+import * as React from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
 
 interface ErrorStateProps {

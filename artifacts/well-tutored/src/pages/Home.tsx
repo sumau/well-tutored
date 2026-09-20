@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useListTutors } from "@workspace/api-client-react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "wouter";
@@ -24,9 +25,6 @@ export default function Home() {
     target?.scrollIntoView({ behavior: "smooth" });
     target?.focus({ preventScroll: true });
   };
-
-  if (tutorsLoading) return <LoadingState />;
-  if (tutorsError) return <ErrorState onRetry={refetchTutors} />;
 
   return (
     <main className="flex-1" data-testid="page-home">
@@ -73,33 +71,42 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[14px]" data-testid="tutor-grid">
-            {(tutors || []).map((tutor) => (
-              <Link href={`/tutors/${tutor.slug}`} key={tutor.id} className="bg-card p-[24px] text-left min-h-[285px] h-full transition-transform hover:-translate-y-1 flex flex-col border border-transparent hover:border-primary/20" data-testid={`tutor-card-${tutor.slug}`}>
-                <div className="flex items-start justify-between gap-[12px] mb-[20px]">
-                  <div className="min-w-0">
-                    <span className="block text-[12px] text-primary font-bold mb-1">{tutor.subject}</span>
-                    <h3 className="font-serif text-[27px] leading-none m-0 tracking-tight">{tutor.name}</h3>
+          {tutorsLoading ? (
+            <LoadingState variant="tutor-grid" message="Loading tutors..." />
+          ) : tutorsError ? (
+            <ErrorState
+              message="We couldn't load the tutor profiles. Please try again."
+              onRetry={refetchTutors}
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[14px]" data-testid="tutor-grid">
+              {(tutors || []).map((tutor) => (
+                <Link href={`/tutors/${tutor.slug}`} key={tutor.id} className="bg-card p-[24px] text-left min-h-[285px] h-full transition-transform hover:-translate-y-1 flex flex-col border border-transparent hover:border-primary/20" data-testid={`tutor-card-${tutor.slug}`}>
+                  <div className="flex items-start justify-between gap-[12px] mb-[20px]">
+                    <div className="min-w-0">
+                      <span className="block text-[12px] text-primary font-bold mb-1">{tutor.subject}</span>
+                      <h3 className="font-serif text-[27px] leading-none m-0 tracking-tight">{tutor.name}</h3>
+                    </div>
+                    <span
+                      className="inline-flex shrink-0 items-center gap-[6px] rounded-full px-[9px] py-[6px] text-[9px] uppercase tracking-[0.1em] font-bold text-foreground/80"
+                      style={{ backgroundColor: tutor.tint }}
+                      aria-label={`Availability: ${availabilityLabels[tutor.availability]}`}
+                    >
+                      <span className={`w-[7px] h-[7px] rounded-full ${availabilityDotClasses[tutor.availability]}`} aria-hidden="true" />
+                      {availabilityLabels[tutor.availability]}
+                    </span>
                   </div>
-                  <span
-                    className="inline-flex shrink-0 items-center gap-[6px] rounded-full px-[9px] py-[6px] text-[9px] uppercase tracking-[0.1em] font-bold text-foreground/80"
-                    style={{ backgroundColor: tutor.tint }}
-                    aria-label={`Availability: ${availabilityLabels[tutor.availability]}`}
-                  >
-                    <span className={`w-[7px] h-[7px] rounded-full ${availabilityDotClasses[tutor.availability]}`} aria-hidden="true" />
-                    {availabilityLabels[tutor.availability]}
-                  </span>
-                </div>
-                <p className="text-[12px] text-muted-foreground leading-[1.55] mt-0 mb-[20px] flex-1 line-clamp-3">
-                  {tutor.profileSummary}
-                </p>
-                <div className="border-t border-border pt-[13px] text-[11px] text-muted-foreground flex justify-between gap-[12px] mt-auto">
-                  <span><b className="text-foreground font-semibold">{tutor.university}</b><br />{tutor.qualification}</span>
-                  <span className="text-right max-w-[100px]">{tutor.style}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
+                  <p className="text-[12px] text-muted-foreground leading-[1.55] mt-0 mb-[20px] flex-1 line-clamp-3">
+                    {tutor.profileSummary}
+                  </p>
+                  <div className="border-t border-border pt-[13px] text-[11px] text-muted-foreground flex justify-between gap-[12px] mt-auto">
+                    <span><b className="text-foreground font-semibold">{tutor.university}</b><br />{tutor.qualification}</span>
+                    <span className="text-right max-w-[100px]">{tutor.style}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
 
         </div>
       </section>
