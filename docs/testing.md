@@ -118,32 +118,9 @@ For local or custom-domain checks, use `SMOKE_BASE_URL` instead of a published
 URL. Per-request and overall smoke timeouts can be adjusted with
 `SMOKE_TIMEOUT_MS` and `SMOKE_TOTAL_TIMEOUT_MS`.
 
-### Development workflow smoke checks
-
-After the API and web development workflows are running, check the proxied
-development domain with:
-
-```sh
-SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:dev
-SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:enquiry
-```
-
-The checks fail when `REPLIT_DEV_DOMAIN` is unavailable, so they cannot
-silently target a direct Vite port or another host. The launch check covers
-health, catalogue data, public routes, invalid-enquiry recovery, and the
-follow-up health check. The browser check covers keyboard navigation,
-validation recovery, disabled-submit behavior, retry behavior, and the
-announced success receipt. Requests are intercepted where necessary, so the
-browser check does not create a real enquiry.
-
-In the Replit Workflows view, this repository assigns the Run button to the
-`Project` workflow. `Project` runs `ci` and `dev-smoke` as child workflows in
-parallel. The API and web services are separate artifact-managed workflows and
-must already be running before the smoke checks are started. The nested
-`dev-smoke` row may appear greyed out and may not be independently runnable
-from that view. Run the `Project` workflow and inspect the `dev-smoke` output,
-or run the two commands above directly from the shell when only the
-development smoke checks are needed.
+For development, pre-publish, and post-publish smoke validation, including the
+Replit workflow instructions and release sequence, see
+[CI and pre-publish validation](ci-validation.md).
 
 ## Recommended verification sequence
 
