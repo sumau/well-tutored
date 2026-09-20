@@ -7,7 +7,10 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "test": "tsx --test src/routes/workspace.lifecycle.test.ts src/lib/resource-types.test.ts src/domain/workspace-validation.test.ts src/middlewares/request-origin.test.ts",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:unit": "tsx --test src/lib/resource-types.test.ts src/domain/workspace-validation.test.ts src/middlewares/request-origin.test.ts",
+    "test:integration": "tsx --test src/routes/workspace.lifecycle.test.ts",
+    "test:deploy": "pnpm run test:unit",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

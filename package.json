@@ -7,7 +7,7 @@
     "build": "pnpm run docs:check && pnpm run typecheck && pnpm -r --if-present run build",
     "docs:check": "pnpm --filter @workspace/scripts run docs:check",
     "postpublish": "pnpm run smoke:launch:published:lifecycle",
-    "verify:deploy": "pnpm --filter @workspace/api-server test && pnpm --filter @workspace/well-tutored test && pnpm --filter @workspace/scripts run test:smoke && pnpm run docs:check && pnpm run typecheck",
+    "verify:deploy": "pnpm --filter @workspace/api-server run test:deploy && pnpm --filter @workspace/well-tutored test && pnpm --filter @workspace/scripts run test:smoke && pnpm run docs:check && pnpm run typecheck",
     "verify:ci": "pnpm --filter @workspace/api-server test && pnpm --filter @workspace/well-tutored test && pnpm --filter @workspace/scripts run test:smoke && pnpm run build",
     "smoke:launch": "pnpm --filter @workspace/scripts run smoke",
     "smoke:dev": "pnpm --filter @workspace/scripts run smoke:dev",

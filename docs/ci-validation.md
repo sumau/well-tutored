@@ -13,7 +13,8 @@ pnpm run verify:ci
 
 This command runs, in order:
 
-1. API server tests.
+1. The complete API server test suite, including database-backed workspace
+   lifecycle integration tests.
 2. Well Tutored web tests.
 3. Smoke-check and publish-lifecycle tests.
 4. `pnpm run build`, which checks documented commands, type-checks libraries
@@ -28,11 +29,26 @@ with `pnpm run verify:ci`. The registration is workspace-level configuration,
 not a file committed to this repository, so keep `verify:ci` in the root
 `package.json` as the source-controlled definition of the check.
 
-The root deployment configuration runs the build-free `pnpm run verify:deploy`
-gate before the artifact-specific production builds. A non-zero result stops
-the publish before the new build can go live. The production artifact builds
-then run once through their normal deployment configuration. `verify:ci`
-remains the complete local check, including a full build.
+CI is the only automated validation path that runs the database-backed API
+integration suite. Those tests create, update, publish, and delete test
+records, so they must use an isolated test database rather than a live
+environment.
+
+## Deployment gate
+
+The root deployment configuration runs the build-free
+`pnpm run verify:deploy` gate before the artifact-specific production builds.
+A non-zero result stops the publish before the new build can go live. The
+production artifact builds then run once through their normal deployment
+configuration.
+
+The deployment gate runs the API server's `test:deploy` script, which includes
+only the non-mutating resource-type, publishability, and request-origin checks.
+It does not run the workspace lifecycle integration suite and therefore does
+not open a database connection for test setup. It also runs the web tests,
+local smoke-check tests, documentation checks, and type checks. `verify:ci`
+remains the complete pre-publish quality check, including the full API suite
+and a full build.
 
 ## Development smoke validation
 

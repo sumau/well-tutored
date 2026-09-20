@@ -17,17 +17,39 @@ Run the API tests with:
 pnpm --filter @workspace/api-server test
 ```
 
-These tests cover:
+This is the complete API suite used by CI. It runs the in-memory unit checks
+and the database-backed workspace lifecycle integration tests. The lifecycle
+tests cover:
 
 - Workspace tutor, resource, article, account, and permission lifecycles,
   including owner-only behavior and Clerk identity reuse.
+
+Run only the non-mutating API checks with:
+
+```sh
+pnpm --filter @workspace/api-server run test:unit
+```
+
+These checks cover:
+
 - Publishability rules for tutor profiles and resources.
 - Supported and legacy resource type normalization.
 - Request-origin normalization and protection against cross-site workspace
   mutations.
 
 The lifecycle tests exercise the Express routes and database-backed behavior
-end to end within the test process.
+end to end within the test process. They create, update, publish, and delete
+test records and are therefore reserved for CI with an isolated test
+database.
+
+The deployment gate uses the API server's non-mutating deployment check:
+
+```sh
+pnpm --filter @workspace/api-server run test:deploy
+```
+
+This is intentionally separate from the complete `test` command so publishing
+never runs database setup or mutation tests against the deployment database.
 
 ### Web application
 
@@ -133,3 +155,8 @@ pnpm run build
 
 Run the launch or enquiry smoke checks when the change affects routing, public
 API responses, deployment configuration, or the enquiry journey.
+
+Before publishing, use `pnpm run verify:ci` for the complete CI check. The
+deployment build separately runs `pnpm run verify:deploy`, which excludes the
+database-backed API lifecycle tests and runs only checks safe for the live
+deployment database.
