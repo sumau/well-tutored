@@ -26,8 +26,8 @@ not this deployment's own, and the Clerk proxy signs its upstream requests with
 the hostname the browser used. Splitting the two is possible but is not a
 configuration this codebase currently supports.
 
-Plus a PostgreSQL database, which is a separate decision from the container
-host — see **Choosing a database** below.
+Plus a PostgreSQL database, hosted separately from the container — see
+**Database** below.
 
 ## Configuration
 
@@ -72,8 +72,8 @@ middleware is mounted under `/api` only.
 
 `fly.toml` is committed and points at `docker/Dockerfile`.
 
-Fly runs the container. The database comes from somewhere else — see **Choosing
-a database** below, and have its `DATABASE_URL` in hand before deploying.
+Fly runs the container; Neon holds the database. Have the Neon connection
+string in hand before deploying — see **Database** below.
 
 ```
 fly apps create well-tutored
@@ -109,40 +109,31 @@ docker build -f docker/Dockerfile --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_live
 Point the platform's health check at `/api/healthz` and let it supply `PORT` if
 it insists on its own.
 
-## Choosing a database
+## Database
 
-Anything that speaks Postgres works. `lib/db/src/index.ts` builds a bare `pg`
-pool from `DATABASE_URL` with no SSL options of its own, so a hosted database
-needs `?sslmode=require` appended to the connection string.
+[Neon](https://neon.tech) hosts the PostgreSQL. It has a free tier, takes real
+backups, and — the part that matters operationally — is reachable over the
+public internet, so every step that runs from this checkout (the schema push
+below, seeding, copying data in) needs no tunnel.
 
-**Neon or Supabase** are the shortest path. Both have a free tier, both take
-real backups, and — the part that matters operationally — both are reachable
-over the public internet. Every step that runs from a local checkout (the schema
-push below, seeding, copying data in) then needs no tunnel at all. Create a
-database, copy the connection string, append `?sslmode=require`, and set it as a
-Fly secret.
+Create a project, then take **two** connection strings from its dashboard. Neon
+marks the pooled one with `-pooler` in the hostname, and they are not
+interchangeable:
 
-**Fly Managed Postgres** keeps the database on the same bill and the same
-private network as the app:
+- The **pooled** string is the application's. Set it as the `DATABASE_URL`
+  secret on the deployment.
+- The **direct** string is for schema work. Use it for the push below.
 
-```
-fly mpg create --name well-tutored-db --region lhr
-fly mpg attach <cluster-id> -a well-tutored   # sets DATABASE_URL to the pooled URL
-```
+Both need `?sslmode=require` appended: `lib/db/src/index.ts` builds a bare `pg`
+pool from `DATABASE_URL` and sets no SSL options of its own, so without it the
+connection is refused.
 
-`attach` points `DATABASE_URL` at the PGBouncer-pooled connection, which is the
-one you want for a web app. Two things to plan for, though. Plans started at
-$38/month when this was written, so check the current price before assuming Fly
-is the cheap option. And the cluster is not reachable over the public internet:
-anything run from a checkout needs `fly mpg proxy` open first, with
-`DATABASE_URL` pointed at the local port it prints.
-
-**`fly postgres create`** is the older unmanaged flavour — a Postgres app in
-your own organisation. Fly's documentation now states they cannot support or
-advise on it, and it is daily volume snapshots only, so a hardware failure loses
-everything written since the last one. `enquiries` is the table that makes that
-unacceptable: tutors and resources can be recreated through `/workspace`, but an
-enquiry that arrives and is lost is gone.
+Nothing in the application is Neon-specific — it is a `DATABASE_URL` and
+nothing more — so any hosted PostgreSQL substitutes, with the pooled/direct
+distinction being whatever that provider's equivalent is. Fly's own Postgres
+offerings are deliberately not covered here: the managed one is private-network
+only, so every command below would need a proxy in front of it, and the
+unmanaged one is something Fly's documentation now says they cannot support.
 
 ## Applying the schema
 
@@ -168,11 +159,9 @@ Three things about that command:
   successfully and silently.
 - **`?sslmode=require`** belongs on the connection string for any hosted
   database, for the reason in the configuration table above.
-- **Prefer a direct connection over a pooled one** for DDL. Neon and Supabase
-  both hand out two URLs; the pooled endpoint (Neon marks it with `-pooler` in
-  the hostname) is the one for the running app. For Fly Managed Postgres, whose
-  `attach` sets the pooled URL, this is one more reason the push goes through
-  `fly mpg proxy` rather than the attached variable.
+- **Use Neon's direct connection string here**, not the pooled one — the
+  `-pooler` hostname is the application's. Pooled connections are a poor fit for
+  DDL.
 
 `push` prompts before anything destructive — unlike the `push-force` the Replit
 hook uses. Read the prompt. Review the diff of `lib/db/src/schema/` first, as
@@ -251,11 +240,11 @@ thing back. The dump orders table data by foreign-key dependency rather than by
 name, so `tutors` lands before `resources` and `enquiries` without any help, and
 it carries the `setval` calls that leave each sequence past the copied ids.
 
-A target reachable only through a tunnel on the host — `fly mpg proxy`, or any
-other — needs `--add-host=host.docker.internal:host-gateway` on that `docker
-run`, with the host's port in `$TARGET_URL` as `host.docker.internal`. The same
-route is already configured for the `migrate` service in `docker-compose.yml`. A
-publicly reachable database needs none of this.
+Neon needs none of this, being publicly reachable. A database that is not — one
+behind a tunnel listening on the host — needs
+`--add-host=host.docker.internal:host-gateway` on that `docker run`, with the
+host's port in `$TARGET_URL` as `host.docker.internal`. The same route is
+already configured for the `migrate` service in `docker-compose.yml`.
 
 **Whether to copy `workspace_accounts` depends on Clerk.** The table's
 `clerk_user_id` is `NOT NULL UNIQUE`, so those rows only mean anything to the
