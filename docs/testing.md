@@ -7,6 +7,63 @@ also use JSDOM where browser APIs are needed.
 For the complete pre-publish validation setup, including Replit validation
 commands, see [CI and pre-publish validation](ci-validation.md).
 
+## Smoke testing at a glance
+
+The project has smoke **helper tests** that run against local fixtures, plus
+live smoke checks that target either the proxied development app or the
+published app. The CI integration tests use a temporary database, but the
+smoke helper tests do not target that database.
+
+```mermaid
+flowchart TB
+  subgraph automated["Automated gates"]
+    ci["ci workflow<br/>verify:ci"] --> ciHelpers["test:smoke<br/>smoke-check.test.ts<br/>publish-smoke.test.ts"]
+    deploy["Deployment build<br/>verify:deploy"] --> deployHelpers["test:smoke<br/>same helper tests"]
+    ci --> ciDb["Temporary PostgreSQL database<br/>for API lifecycle integration tests"]
+  end
+
+  subgraph development["Live development smoke"]
+    project["Project workflow<br/>ci → dev-smoke"] --> devLaunch["smoke:dev<br/>smoke-check.ts --dev"]
+    project --> devBrowser["smoke:enquiry<br/>Chromium browser check"]
+    devLaunch --> devTarget["https://$REPLIT_DEV_DOMAIN<br/>proxied development app + /api"]
+    devBrowser --> devTarget
+    devLaunch --> devCoverage["Health, catalogue, public pages,<br/>invalid-enquiry recovery<br/>Clerk proxy check skipped"]
+    devBrowser --> devBrowserCoverage["Keyboard flow, validation,<br/>retry, success receipt<br/>requests intercepted"]
+  end
+
+  subgraph published["Published-app smoke"]
+    postpublish["After publish<br/>postpublish lifecycle"] --> publishedLaunch["smoke:launch:published:lifecycle<br/>uses REPLIT_PUBLISHED_URL"]
+    manual["Manual shell command"] --> manualLaunch["smoke:launch<br/>or smoke:launch:published"]
+    manual --> publishedBrowser["smoke:enquiry:published<br/>Chromium browser check"]
+    publishedLaunch --> publishedTarget["Published URL<br/>checked against SMOKE_PRODUCTION_URL"]
+    manualLaunch --> publishedTarget
+    publishedBrowser --> publishedTarget
+    publishedTarget --> publishedCoverage["Health, Clerk proxy, catalogue,<br/>public pages, invalid-enquiry recovery"]
+    publishedBrowser --> publishedBrowserCoverage["Keyboard flow, validation,<br/>retry, success receipt<br/>requests intercepted"]
+  end
+
+  classDef gate fill:#e8eefc,stroke:#4666a8,color:#172554
+  classDef target fill:#e9f7ef,stroke:#3b8a5a,color:#14532d
+  classDef coverage fill:#fff7df,stroke:#b7791f,color:#713f12
+  class ci,deploy,project,postpublish,manual gate
+  class devTarget,publishedTarget target
+  class devCoverage,devBrowserCoverage,publishedCoverage,publishedBrowserCoverage,ciDb coverage
+```
+
+In short:
+
+- `test:smoke` is a code-level test suite for URL selection, deployment
+  metadata, redirects, timeouts, and response handling. It runs inside both
+  `verify:ci` and `verify:deploy`; it does not contact the live app.
+- `smoke:dev` and `smoke:enquiry` run against the proxied development domain
+  from the sequential `Project` workflow after `ci`.
+- `smoke:launch:published:lifecycle` runs automatically after publishing.
+  `smoke:launch` and `smoke:enquiry:published` are manual published-target
+  variants.
+- The browser enquiry checks intercept the submission response, so they do not
+  create a real enquiry. The launch checks send an intentionally invalid
+  enquiry payload and expect validation to reject it before insertion.
+
 ## Test suites
 
 ### API server
