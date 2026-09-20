@@ -13,11 +13,14 @@ pnpm run verify:ci
 
 This command runs, in order:
 
-1. The complete API server test suite, including database-backed workspace
+1. The test-database configuration guard tests.
+2. The required test-database environment check.
+3. Schema preparation against the dedicated `TEST_DATABASE_URL` connection.
+4. The complete API server test suite, including database-backed workspace
    lifecycle integration tests.
-2. Well Tutored web tests.
-3. Smoke-check and publish-lifecycle tests.
-4. `pnpm run build`, which checks documented commands, type-checks libraries
+5. Well Tutored web tests.
+6. Smoke-check and publish-lifecycle tests.
+7. `pnpm run build`, which checks documented commands, type-checks libraries
    and workspace packages, and builds the packages that define a build script.
 
 The command stops at the first failure and returns a non-zero exit code. It is
@@ -32,7 +35,11 @@ not a file committed to this repository, so keep `verify:ci` in the root
 CI is the only automated validation path that runs the database-backed API
 integration suite. Those tests create, update, publish, and delete test
 records, so they must use an isolated test database rather than a live
-environment.
+environment. The `ci` workflow requires `TEST_DATABASE_URL`, rejects a value
+equal to `DATABASE_URL`, and applies the current schema to the test connection
+before the API suite starts. If the variable is missing or the schema cannot be
+applied, validation stops with an actionable test-database error instead of
+falling back to the application database.
 
 ## Deployment gate
 
@@ -96,12 +103,16 @@ published data can differ from development.
 
 ## Recommended release sequence
 
-1. Run the `ci` validation command.
+1. Run the `ci` validation command. It prepares and uses only the dedicated
+   integration-test database for database-backed tests.
 2. Start or refresh the API and web workflows.
 3. Run the `dev-smoke` validation command.
 4. Publish the app.
 5. Confirm the post-publish launch smoke check passes.
 
-The dev smoke command is intentionally separate from `verify:ci` because it
-depends on a live development environment. The published check is intentionally
-separate because it validates the deployment that users will access.
+The committed `Project` workflow runs `ci` and then `dev-smoke` sequentially.
+This prevents development smoke checks from overlapping with CI's mutable
+integration-test work. The dev smoke command is intentionally separate from
+`verify:ci` because it depends on a live development environment. The published
+check is intentionally separate because it validates the deployment that users
+will access.

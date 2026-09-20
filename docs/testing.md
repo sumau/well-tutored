@@ -44,7 +44,17 @@ database. Set `TEST_DATABASE_URL` to the dedicated PostgreSQL connection;
 `test:integration` sets `NODE_ENV=test`, and the database package refuses to
 fall back to `DATABASE_URL` or use the same URL as the application. CI must
 apply the current schema to that database before running the integration
-script. Each process also uses a unique fixture namespace, so overlapping
+script. The CI preparation command does both checks explicitly:
+
+```sh
+pnpm run check:test-database
+pnpm run prepare:test-database
+```
+
+The first command fails if `TEST_DATABASE_URL` is missing or points to
+`DATABASE_URL`. The second applies the current schema using the test URL as its
+target and fails with a connection-specific message if that database is not
+reachable. Each process also uses a unique fixture namespace, so overlapping
 runs do not reuse or delete one another's records.
 
 The deployment gate uses the API server's non-mutating deployment check:
@@ -161,7 +171,8 @@ pnpm run build
 Run the launch or enquiry smoke checks when the change affects routing, public
 API responses, deployment configuration, or the enquiry journey.
 
-Before publishing, use `pnpm run verify:ci` for the complete CI check. The
-deployment build separately runs `pnpm run verify:deploy`, which excludes the
-database-backed API lifecycle tests and runs only checks safe for the live
-deployment database.
+Before publishing, use `pnpm run verify:ci` for the complete CI check. It
+requires and prepares the dedicated test database before running the
+database-backed API lifecycle tests. The deployment build separately runs
+`pnpm run verify:deploy`, which excludes the database-backed API lifecycle tests
+and runs only checks safe for the live deployment database.

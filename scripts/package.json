@@ -6,6 +6,9 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "docs:check": "tsx ./src/docs-check.ts",
+    "check:test-database": "tsx ./src/test-database.ts",
+    "prepare:test-database": "tsx ./src/prepare-test-database.ts",
+    "test:database-config": "tsx --test ./src/test-database.test.ts",
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:dev": "tsx ./src/smoke-check.ts --dev",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
