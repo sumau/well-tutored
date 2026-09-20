@@ -4,7 +4,7 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ignoredDirectories = new Set([
@@ -23,6 +23,12 @@ export type DocumentationCommand = {
   command: string;
 };
 
+export type DocumentationLink = {
+  filePath: string;
+  lineNumber: number;
+  target: string;
+};
+
 export type PackageManifest = {
   name?: string;
   scripts?: Record<string, string>;
@@ -35,6 +41,7 @@ export type PackageManifestRecord = {
 
 export type DocumentationCheckResult = {
   commands: DocumentationCommand[];
+  links: DocumentationLink[];
   errors: string[];
 };
 
@@ -108,6 +115,68 @@ export function extractDocumentedCommands(
   }
 
   return commands;
+}
+
+export function extractLocalLinks(
+  markdown: string,
+  filePath: string,
+): DocumentationLink[] {
+  const links: DocumentationLink[] = [];
+  const linkPattern = /\[[^\]]+\]\(([^)\s]+)(?:\s+["'][^)]*)?\)/g;
+
+  for (const [index, line] of markdown.split(/\r?\n/).entries()) {
+    for (const match of line.matchAll(linkPattern)) {
+      const target = match[1];
+      if (
+        !target ||
+        target.startsWith("#") ||
+        target.startsWith("//") ||
+        /^[a-z][a-z\d+.-]*:/i.test(target)
+      ) {
+        continue;
+      }
+
+      links.push({
+        filePath,
+        lineNumber: index + 1,
+        target,
+      });
+    }
+  }
+
+  return links;
+}
+
+export function validateLocalLinks(
+  links: DocumentationLink[],
+  rootDir: string,
+): string[] {
+  const errors: string[] = [];
+
+  for (const link of links) {
+    const targetPath = link.target.split(/[?#]/, 1)[0];
+    if (!targetPath) continue;
+
+    const sourcePath = join(rootDir, link.filePath);
+    const resolvedTarget = resolve(dirname(sourcePath), targetPath);
+    const relativeTarget = relative(rootDir, resolvedTarget);
+    const location = `${link.filePath}:${link.lineNumber}`;
+
+    if (relativeTarget === ".." || relativeTarget.startsWith("../")) {
+      errors.push(
+        `${location}: local link "${link.target}" resolves outside the repository.`,
+      );
+      continue;
+    }
+
+    if (!existsSync(resolvedTarget)) {
+      errors.push(
+        `${location}: local link "${link.target}" resolves to "${relativeTarget}", but that path was not found.`,
+      );
+    }
+  }
+
+  return errors;
 }
 
 function readPackageManifests(rootDir: string): PackageManifestRecord[] {
