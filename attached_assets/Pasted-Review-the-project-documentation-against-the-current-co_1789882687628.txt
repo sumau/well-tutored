@@ -1,0 +1,77 @@
+Review the project documentation against the current codebase.
+
+Documentation to review:
+- replit.md
+- docs/**/*.md
+
+Ignore:
+- .local/skills/**
+- .local/tasks/**
+- .agents/memory/**
+- node_modules/**
+- dist/** and other generated output
+
+Inspect the relevant source files, package manifests, workflows, API routes, database schema, OpenAPI specification, and artifact configuration.
+
+Look for:
+- Commands that no longer work
+- File paths that no longer exist
+- Architecture descriptions that no longer match the code
+- Missing or outdated routes
+- Incorrect environment-variable instructions
+- Contradictions between documentation files
+- Important behavior that is not documented
+
+Do not modify files and do not create tasks automatically.
+
+If no actionable issues are found, output exactly:
+
+No documentation task needed.
+
+If issues are found, output exactly one consolidated task in this format:
+
+# Keep project documentation aligned with the codebase
+
+## What & Why
+Review and update the project documentation so that it accurately reflects the current codebase, commands, file structure, architecture, routes, environment variables, and operating procedures.
+
+## Done looks like
+- All documented commands match the current package scripts and workflows.
+- Documented file paths and project structure match the repository.
+- Architecture and route descriptions match the implementation.
+- Environment-variable and setup instructions are accurate.
+- Contradictions between replit.md and docs/ are resolved.
+- Updated documentation is checked against the relevant source files.
+
+## Out of scope
+- Changing application behavior solely to match outdated documentation
+- Rewriting the documentation structure
+- Updating Replit-provided skill files
+- Updating task plans or Agent memory files
+
+## Steps
+1. Review the current documentation against the relevant codebase files.
+2. Correct outdated or inaccurate documentation.
+3. Add missing information important for development, operation, or maintenance.
+4. Resolve contradictions between documentation files.
+5. Verify the documented commands and instructions.
+6. Summarize the documentation changes and any remaining uncertainties.
+
+## Findings to address
+### Finding 1: <short description>
+- Documentation: <verified file path and section>
+- Codebase evidence: <verified file path and relevant behavior>
+- Required correction: <what should change>
+
+### Finding 2: <short description>
+- Documentation: <verified file path and section>
+- Codebase evidence: <verified file path and relevant behavior>
+- Required correction: <what should change>
+
+Rules:
+- Always produce zero or one task, never multiple tasks.
+- Do not include a separate Relevant files section.
+- Include verified file paths inline under each finding.
+- Only report issues supported by the current codebase.
+- Do not make changes automatically.
+- Do not create a project task automatically.
