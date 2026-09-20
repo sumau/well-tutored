@@ -41,10 +41,6 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 
 The public experience presents women tutors educated at Russell Group universities, their expertise and availability, and a library of tutor-written learning resources. Visitors can open a tutor profile and submit a named-tutor enquiry. Approved workspace users can manage tutor profiles, resources, and workspace accounts.
 
-## User preferences
-
-- Well Tutored A is the source of truth for this standalone app; no comparison with Well Tutored B is needed.
-
 ## Gotchas
 
 - Run `pnpm --filter @workspace/api-spec run codegen` after changing `lib/api-spec/openapi.yaml`.
