@@ -24,6 +24,12 @@ tests cover:
 - Workspace tutor, resource, article, account, and permission lifecycles,
   including owner-only behavior and Clerk identity reuse.
 
+Running this package test command directly does not provision a database. Use
+`pnpm run verify:ci` for the CI path that creates an isolated temporary local
+PostgreSQL database when `TEST_DATABASE_URL` is not supplied, applies the
+current schema, runs the integration tests, and removes the temporary database
+afterward.
+
 Run only the non-mutating API checks with:
 
 ```sh
