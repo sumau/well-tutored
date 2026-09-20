@@ -17,6 +17,7 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_TOTAL_TIMEOUT_MS = 60_000;
 const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
 const PUBLISHED_CHECK_FLAG = "--published";
+const DEVELOPMENT_CHECK_FLAG = "--dev";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -195,11 +196,26 @@ function resolveArtifactProductionUrl(): { value: string; source: string } {
 
 function resolveConfiguredBaseUrl(): { value: string; source: string } {
   const explicit = process.env.SMOKE_BASE_URL?.trim();
+  const isDevelopmentCheck = process.argv.includes(DEVELOPMENT_CHECK_FLAG);
+  const isPublishedCheck = process.argv.includes(PUBLISHED_CHECK_FLAG);
+
+  if (isDevelopmentCheck && isPublishedCheck) {
+    throw new SmokeCheckError(
+      "Development and published launch checks cannot run together.",
+    );
+  }
+
+  if (isDevelopmentCheck && !explicit) {
+    throw new SmokeCheckError(
+      "Development launch check requires SMOKE_BASE_URL so it cannot accidentally target production.",
+    );
+  }
+
   if (explicit) {
     return { value: explicit, source: "SMOKE_BASE_URL" };
   }
 
-  if (process.argv.includes(PUBLISHED_CHECK_FLAG)) {
+  if (isPublishedCheck) {
     const publishedUrlSource = process.env[PUBLISHED_URL_ENV_KEY]?.trim()
       ? PUBLISHED_URL_ENV_KEY
       : process.env[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim()
@@ -416,8 +432,10 @@ async function runSmokeCheckSteps(
   baseUrl: URL,
   timeoutMs: number,
   deadline: SmokeDeadline,
+  isDevelopmentCheck: boolean,
 ) {
   const passed: string[] = [];
+  const skipped: string[] = [];
 
   const health = requireRecord(
     await checkJson(baseUrl, "/api/healthz", timeoutMs, 200, deadline),
@@ -428,35 +446,41 @@ async function runSmokeCheckSteps(
   }
   passed.push("/api/healthz");
 
-  const clerkEnvironment = requireRecord(
-    await checkJson(
-      baseUrl,
+  if (isDevelopmentCheck) {
+    skipped.push(
+      "/api/__clerk/v1/environment (Clerk proxy is production-only)",
+    );
+  } else {
+    const clerkEnvironment = requireRecord(
+      await checkJson(
+        baseUrl,
+        "/api/__clerk/v1/environment",
+        timeoutMs,
+        200,
+        deadline,
+      ),
       "/api/__clerk/v1/environment",
-      timeoutMs,
-      200,
-      deadline,
-    ),
-    "/api/__clerk/v1/environment",
-  );
-  const clerkAuthConfig = requireRecord(
-    clerkEnvironment.auth_config,
-    "/api/__clerk/v1/environment.auth_config",
-  );
-  const clerkDisplayConfig = requireRecord(
-    clerkEnvironment.display_config,
-    "/api/__clerk/v1/environment.display_config",
-  );
-  if (clerkAuthConfig.object !== "auth_config") {
-    throw new SmokeCheckError(
-      `/api/__clerk/v1/environment: unexpected auth_config object.`,
     );
-  }
-  if (clerkDisplayConfig.object !== "display_config") {
-    throw new SmokeCheckError(
-      `/api/__clerk/v1/environment: unexpected display_config object.`,
+    const clerkAuthConfig = requireRecord(
+      clerkEnvironment.auth_config,
+      "/api/__clerk/v1/environment.auth_config",
     );
+    const clerkDisplayConfig = requireRecord(
+      clerkEnvironment.display_config,
+      "/api/__clerk/v1/environment.display_config",
+    );
+    if (clerkAuthConfig.object !== "auth_config") {
+      throw new SmokeCheckError(
+        `/api/__clerk/v1/environment: unexpected auth_config object.`,
+      );
+    }
+    if (clerkDisplayConfig.object !== "display_config") {
+      throw new SmokeCheckError(
+        `/api/__clerk/v1/environment: unexpected display_config object.`,
+      );
+    }
+    passed.push("/api/__clerk/v1/environment");
   }
-  passed.push("/api/__clerk/v1/environment");
 
   const tutors = requireArray(
     await checkJson(baseUrl, "/api/tutors", timeoutMs, 200, deadline),
@@ -586,16 +610,25 @@ async function runSmokeCheckSteps(
   for (const check of passed) {
     console.log(`  ✓ ${check}`);
   }
+  for (const check of skipped) {
+    console.log(`  - ${check}`);
+  }
 }
 
 export async function runSmokeCheck() {
   const baseUrl = resolveBaseUrl();
   const timeoutMs = resolveTimeoutMs();
   const totalTimeoutMs = resolveTotalTimeoutMs();
+  const isDevelopmentCheck = process.argv.includes(DEVELOPMENT_CHECK_FLAG);
   const deadline = createSmokeDeadline(totalTimeoutMs);
 
   try {
-    await runSmokeCheckSteps(baseUrl, timeoutMs, deadline);
+    await runSmokeCheckSteps(
+      baseUrl,
+      timeoutMs,
+      deadline,
+      isDevelopmentCheck,
+    );
   } finally {
     deadline.close();
   }

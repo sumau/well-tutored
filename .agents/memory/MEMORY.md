@@ -5,3 +5,4 @@
 - [Mutation submission races](mutation-submission-races.md) — use a synchronous in-flight latch when repeated events can arrive before React mutation state rerenders.
 - [Public/auth startup boundary](public-auth-boundary.md) — keep public route modules Clerk-free and defer auth/workspace code behind path-based lazy loading.
 - [JSDOM page test harness](jsdom-page-test-harness.md) — install global location/history/event listeners when rendering Wouter pages with tsx and JSDOM.
+- [Development smoke checks](development-smoke-checks.md) — dev Clerk proxying is intentionally disabled, so dev smoke must use explicit target mode and skip only that production assertion.

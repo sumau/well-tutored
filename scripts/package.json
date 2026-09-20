@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "docs:check": "tsx ./src/docs-check.ts",
     "smoke": "tsx ./src/smoke-check.ts",
+    "smoke:dev": "tsx ./src/smoke-check.ts --dev",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
     "smoke:published:lifecycle": "tsx ./src/publish-smoke.ts",
     "smoke:enquiry": "tsx ./src/enquiry-browser-smoke.ts",

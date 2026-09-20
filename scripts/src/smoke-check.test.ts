@@ -289,6 +289,7 @@ const failureCases: FailureCase[] = [
 function runSmokeCommand(
   baseUrl: string | undefined,
   options: {
+    development?: boolean;
     published?: boolean;
     publishedUrl?: string;
     publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
@@ -307,6 +308,7 @@ function runSmokeCommand(
       "tsx",
       smokeFile,
       ...(options.published ? ["--published"] : []),
+      ...(options.development ? ["--dev"] : []),
     ],
     {
       cwd: scriptsRoot,
@@ -545,6 +547,40 @@ test("published check rejects missing current deployment metadata", async () => 
     result.output,
     /Published launch check requires SMOKE_PUBLISHED_URL or REPLIT_PUBLISHED_URL from the current Publishing metadata/,
   );
+});
+
+test("development check requires an explicit development target", async () => {
+  const result = await runSmokeCommand(undefined, { development: true });
+
+  assert.notEqual(result.exitCode, 0, result.output);
+  assert.match(
+    result.output,
+    /Development launch check requires SMOKE_BASE_URL so it cannot accidentally target production/,
+  );
+});
+
+test("development check skips the production-only Clerk proxy assertion", async () => {
+  const fixture = await startFixture({
+    name: "healthy development run",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, { development: true });
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /- \/api\/__clerk\/v1\/environment \(Clerk proxy is production-only\)/,
+    );
+    assert.equal(
+      fixture.requests.includes("GET /api/__clerk/v1/environment"),
+      false,
+    );
+  } finally {
+    await fixture.close();
+  }
 });
 
 test("published check rejects a deployment domain that drifted from the artifact target", async () => {

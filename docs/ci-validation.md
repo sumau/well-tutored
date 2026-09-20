@@ -34,19 +34,21 @@ After the API and web development workflows are running, validate the
 proxied development domain:
 
 ```sh
-SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:launch
+SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:dev
 SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:enquiry
 ```
 
-The launch check validates health, Clerk proxy configuration, catalogue data,
-public routes, and invalid-enquiry recovery. The browser check validates the
-enquiry flow with keyboard navigation, validation recovery, retry behavior,
-and an announced success receipt. Its requests are intercepted so it does not
-create a real enquiry.
+The development launch check validates health, catalogue data, public routes,
+and invalid-enquiry recovery. It intentionally skips the Clerk Frontend API
+proxy assertion because the API server only enables that proxy in production.
+The browser check validates the enquiry flow with keyboard navigation,
+validation recovery, retry behavior, and an announced success receipt. Its
+requests are intercepted so it does not create a real enquiry.
 
 The `dev-smoke` validation command is registered in Replit with the same
-development-domain target. It expects `REPLIT_DEV_DOMAIN` and fails rather
-than silently checking the wrong host when that variable is unavailable.
+development-domain target and the `smoke:dev` mode. It expects
+`REPLIT_DEV_DOMAIN` and fails rather than silently checking the wrong host when
+that variable is unavailable.
 
 Use the proxied development domain instead of a direct Vite port so the web
 application and `/api` routes are checked together.

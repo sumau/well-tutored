@@ -9,6 +9,7 @@
     "postpublish": "pnpm run smoke:launch:published:lifecycle",
     "verify:ci": "pnpm --filter @workspace/api-server test && pnpm --filter @workspace/well-tutored test && pnpm --filter @workspace/scripts run test:smoke && pnpm run build",
     "smoke:launch": "pnpm --filter @workspace/scripts run smoke",
+    "smoke:dev": "pnpm --filter @workspace/scripts run smoke:dev",
     "smoke:launch:published": "pnpm --filter @workspace/scripts run smoke:published",
     "smoke:launch:published:lifecycle": "pnpm --filter @workspace/scripts run smoke:published:lifecycle",
     "smoke:enquiry": "pnpm --filter @workspace/scripts run smoke:enquiry",

@@ -39,12 +39,12 @@ isValidation = true
 name = "dev-smoke"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "test -n \"$REPLIT_DEV_DOMAIN\" && SMOKE_BASE_URL=\"https://$REPLIT_DEV_DOMAIN\" pnpm smoke:launch && SMOKE_BASE_URL=\"https://$REPLIT_DEV_DOMAIN\" pnpm smoke:enquiry"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "test -n \"$REPLIT_DEV_DOMAIN\" && SMOKE_BASE_URL=\"https://$REPLIT_DEV_DOMAIN\" pnpm smoke:dev && SMOKE_BASE_URL=\"https://$REPLIT_DEV_DOMAIN\" pnpm smoke:enquiry"
 
 [agent]
 stack = "PNPM_WORKSPACE"
