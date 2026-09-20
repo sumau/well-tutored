@@ -107,10 +107,42 @@ CLAUDE.md warns.
 
 `ensureSeedContent()` only runs when `NODE_ENV=development`
 (`artifacts/api-server/src/index.ts`), so a fresh deployment database has no
-tutors or resources and the public directory renders empty. Either create content
-through `/workspace` after bootstrapping an owner account — see
-[workspace-owner-bootstrap.md](workspace-owner-bootstrap.md) — or copy an
-existing database's data across.
+tutors or resources and the public directory renders empty. There are three ways
+on from there: deploy empty and create content through `/workspace`, seed the
+illustrative content, or copy an existing database's data across.
+
+### Deploying against an empty database
+
+Perfectly workable, and the shortest path to a deployment you can log into. Two
+things behave differently and neither is a fault:
+
+- The directory and resource library render their empty states, and `/api/tutors`
+  returns an empty list.
+- `pnpm run smoke:launch` **fails**, because it asserts at least one published
+  tutor and one published resource. It aborts there, so it never reaches the page
+  and enquiry checks either. Until there is content, check `/api/healthz` and load
+  `/` by hand; the smoke check becomes meaningful again once the database has
+  something in it.
+
+To get the illustrative tutors and resources without copying a database, point
+the development API at the deployment database: its `dev` script sets
+`NODE_ENV=development`, which is the condition the seeding is gated on. With a
+tunnel to that database open, override `DATABASE_URL` on the `api` service and
+interrupt it once it logs that it is listening. Seeding is idempotent, so a
+repeat run changes nothing.
+
+### Switching Clerk instances later
+
+Standing the deployment up on a development instance and moving to a production
+one when a domain arrives means your Clerk user ID changes, so budget one step
+for it. Tutors, resources, drafts and enquiries are untouched — none of them
+reference Clerk. Your `workspace_accounts` row is the exception: the new instance
+issues a different `clerk_user_id`, so signing in creates a second, pending
+account, and the stale `owner` row makes the `UPDATE` in
+[workspace-owner-bootstrap.md](workspace-owner-bootstrap.md) a no-op, since it is
+guarded by `AND NOT EXISTS (SELECT 1 FROM workspace_accounts WHERE role =
+'owner')`. Delete the stale row first, then sign in on the new instance and
+promote again.
 
 ### Copying data from another deployment
 
