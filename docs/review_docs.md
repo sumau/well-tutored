@@ -31,9 +31,10 @@ repository root.
 ## Rules
 
 - Do not modify files.
-- Do not create or update project tasks automatically.
+- When actionable issues are found, create exactly one consolidated project task
+  using the output structure below. Do not create multiple tasks.
 - Do not treat attached files as project documentation unless explicitly listed.
-- Always produce zero or one task, never multiple tasks.
+- Always create zero or one consolidated task, never multiple tasks.
 
 ## Output
 
@@ -43,7 +44,8 @@ If no actionable issues are found, output exactly:
 No documentation task needed.
 ```
 
-If issues are found, output exactly one consolidated task using this structure:
+If issues are found, create exactly one consolidated project task using this
+structure, then report the created task using the same Markdown:
 
 ```markdown
 # Keep project documentation aligned with the codebase
