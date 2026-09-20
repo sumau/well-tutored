@@ -11,6 +11,8 @@ import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
 import {
+  SMOKE_TOTAL_TIMEOUT_MAX_MS,
+  SMOKE_TOTAL_TIMEOUT_MIN_MS,
   SMOKE_TIMEOUT_MAX_MS,
   SMOKE_TIMEOUT_MIN_MS,
 } from "./smoke-check.js";
@@ -291,6 +293,7 @@ function runSmokeCommand(
     publishedUrl?: string;
     publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
     timeoutMs?: string;
+    totalTimeoutMs?: string;
   } = {},
 ): Promise<{
   exitCode: number | null;
@@ -322,6 +325,7 @@ function runSmokeCommand(
             ? options.publishedUrl
             : "",
         SMOKE_TIMEOUT_MS: options.timeoutMs ?? "2000",
+        SMOKE_TOTAL_TIMEOUT_MS: options.totalTimeoutMs ?? "60000",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -492,6 +496,47 @@ for (const timeoutMs of [
   );
 }
 
+for (const totalTimeoutMs of [
+  "not-a-number",
+  String(SMOKE_TOTAL_TIMEOUT_MIN_MS - 1),
+  "1000.5",
+  String(SMOKE_TOTAL_TIMEOUT_MAX_MS + 1),
+  "Infinity",
+  "NaN",
+]) {
+  test(
+    `invalid SMOKE_TOTAL_TIMEOUT_MS="${totalTimeoutMs}" fails before making requests ` +
+      `(supported range: ${SMOKE_TOTAL_TIMEOUT_MIN_MS}-${SMOKE_TOTAL_TIMEOUT_MAX_MS}ms integers)`,
+    async () => {
+      const fixture = await startFixture({
+        name: `unused total timeout validation fixture (${totalTimeoutMs})`,
+        expectedMessage: "",
+        respond: () => false,
+      });
+
+      try {
+        const result = await runSmokeCommand(fixture.url, { totalTimeoutMs });
+
+        assert.notEqual(result.exitCode, 0, result.output);
+        assert.match(
+          result.output,
+          new RegExp(
+            `SMOKE_TOTAL_TIMEOUT_MS must be an integer number of milliseconds between ` +
+              `${SMOKE_TOTAL_TIMEOUT_MIN_MS} and ${SMOKE_TOTAL_TIMEOUT_MAX_MS}; received "${totalTimeoutMs.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&",
+              )}"\\.`,
+          ),
+        );
+        assert.deepEqual(fixture.requests, []);
+        assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
+      } finally {
+        await fixture.close();
+      }
+    },
+  );
+}
+
 test("published check rejects missing current deployment metadata", async () => {
   const result = await runSmokeCommand(undefined, { published: true });
 
@@ -589,6 +634,55 @@ test(
     }
   },
 );
+
+test("overall smoke deadline stops sequential slow requests", async () => {
+  const fixture = await startFixture({
+    name: "sequential slow requests",
+    expectedMessage:
+      "/api/__clerk/v1/environment: overall smoke check timed out after 1000ms.",
+    respond: (request, response) => {
+      const path = request.url ?? "/";
+      if (
+        path !== "/api/healthz" &&
+        path !== "/api/__clerk/v1/environment"
+      ) {
+        return false;
+      }
+
+      response.on("error", () => {});
+      setTimeout(() => {
+        if (path === "/api/healthz") {
+          writeJson(response, { status: "ok" });
+        } else {
+          writeJson(response, {
+            auth_config: { object: "auth_config" },
+            display_config: { object: "display_config" },
+          });
+        }
+      }, 550);
+      return true;
+    },
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, {
+      totalTimeoutMs: "1000",
+    });
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /\/api\/__clerk\/v1\/environment: overall smoke check timed out after 1000ms\./,
+    );
+    assert.match(result.output, /SMOKE_TOTAL_TIMEOUT_MS/);
+    assert.deepEqual(fixture.requests, [
+      "GET /api/healthz",
+      "GET /api/__clerk/v1/environment",
+    ]);
+  } finally {
+    await fixture.close();
+  }
+});
 
 test("healthy launch checks pass entirely against the loopback fixture", async () => {
   const fixture = await startFixture({

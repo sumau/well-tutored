@@ -11,7 +11,10 @@ const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
 const PUBLISHING_OUTPUT_URL_ENV_KEY = "REPLIT_PUBLISHED_URL";
 export const SMOKE_TIMEOUT_MIN_MS = 100;
 export const SMOKE_TIMEOUT_MAX_MS = 60_000;
+export const SMOKE_TOTAL_TIMEOUT_MIN_MS = 1_000;
+export const SMOKE_TOTAL_TIMEOUT_MAX_MS = 300_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TOTAL_TIMEOUT_MS = 60_000;
 const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
 const PUBLISHED_CHECK_FLAG = "--published";
 
@@ -24,6 +27,49 @@ type ResponseData = {
 };
 
 class SmokeCheckError extends Error {}
+
+type SmokeDeadline = {
+  timeoutMs: number;
+  signal: AbortSignal;
+  remainingMs: () => number;
+  assertAvailable: (path: string) => void;
+  isExpired: () => boolean;
+  close: () => void;
+};
+
+function overallDeadlineError(path: string, timeoutMs: number) {
+  return new SmokeCheckError(
+    `${path}: overall smoke check timed out after ${timeoutMs}ms. ` +
+      `Increase SMOKE_TOTAL_TIMEOUT_MS only if this target is expected to be slow, ` +
+      `or fix the slow or unavailable check.`,
+  );
+}
+
+function createSmokeDeadline(timeoutMs: number): SmokeDeadline {
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  let expired = false;
+  const expire = () => {
+    if (expired) return;
+    expired = true;
+    controller.abort();
+  };
+  const timer = setTimeout(expire, timeoutMs);
+
+  return {
+    timeoutMs,
+    signal: controller.signal,
+    remainingMs: () => Math.max(0, timeoutMs - (Date.now() - startedAt)),
+    assertAvailable: (path: string) => {
+      if (expired || Date.now() - startedAt >= timeoutMs) {
+        expire();
+        throw overallDeadlineError(path, timeoutMs);
+      }
+    },
+    isExpired: () => expired || Date.now() - startedAt >= timeoutMs,
+    close: () => clearTimeout(timer),
+  };
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -246,15 +292,44 @@ export function resolveTimeoutMs(): number {
   return configured;
 }
 
+export function resolveTotalTimeoutMs(): number {
+  const rawConfigured = process.env.SMOKE_TOTAL_TIMEOUT_MS;
+  const configured =
+    rawConfigured === undefined
+      ? DEFAULT_TOTAL_TIMEOUT_MS
+      : Number(rawConfigured);
+  if (
+    (rawConfigured !== undefined &&
+      !SMOKE_TIMEOUT_FORMAT.test(rawConfigured)) ||
+    !Number.isSafeInteger(configured) ||
+    configured < SMOKE_TOTAL_TIMEOUT_MIN_MS ||
+    configured > SMOKE_TOTAL_TIMEOUT_MAX_MS
+  ) {
+    throw new SmokeCheckError(
+      `SMOKE_TOTAL_TIMEOUT_MS must be an integer number of milliseconds between ` +
+        `${SMOKE_TOTAL_TIMEOUT_MIN_MS} and ${SMOKE_TOTAL_TIMEOUT_MAX_MS}; received "${rawConfigured}".`,
+    );
+  }
+  return configured;
+}
+
 async function request(
   baseUrl: URL,
   path: string,
   timeoutMs: number,
   init?: RequestInit,
+  deadline?: SmokeDeadline,
 ): Promise<ResponseData> {
   const url = new URL(path, baseUrl);
+  deadline?.assertAvailable(path);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const abortForDeadline = () => controller.abort();
+  deadline?.signal.addEventListener("abort", abortForDeadline, { once: true });
+  const requestTimeoutMs = Math.max(
+    1,
+    Math.min(timeoutMs, deadline?.remainingMs() ?? timeoutMs),
+  );
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
   let response: Response;
   let body: string;
 
@@ -269,15 +344,19 @@ async function request(
     });
     body = await response.text();
   } catch (error) {
+    if (deadline?.isExpired()) {
+      throw overallDeadlineError(path, deadline.timeoutMs);
+    }
     const reason =
       error instanceof Error && error.name === "AbortError"
-        ? `timed out after ${timeoutMs}ms`
+        ? `timed out after ${requestTimeoutMs}ms`
         : error instanceof Error
           ? error.message
           : String(error);
     throw new SmokeCheckError(`${path}: request failed: ${reason}`);
   } finally {
     clearTimeout(timeout);
+    deadline?.signal.removeEventListener("abort", abortForDeadline);
   }
 
   const finalUrl = new URL(response.url);
@@ -300,16 +379,26 @@ async function checkJson(
   path: string,
   timeoutMs: number,
   expectedStatus: number,
+  deadline: SmokeDeadline,
 ): Promise<unknown> {
-  const data = await request(baseUrl, path, timeoutMs);
+  const data = await request(baseUrl, path, timeoutMs, undefined, deadline);
   expectStatus(data, expectedStatus, path);
   return parseJson(data, path);
 }
 
-async function checkPublicPage(baseUrl: URL, path: string, timeoutMs: number) {
-  const data = await request(baseUrl, path, timeoutMs, {
-    headers: { Accept: "text/html" },
-  });
+async function checkPublicPage(
+  baseUrl: URL,
+  path: string,
+  timeoutMs: number,
+  deadline: SmokeDeadline,
+) {
+  const data = await request(
+    baseUrl,
+    path,
+    timeoutMs,
+    { headers: { Accept: "text/html" } },
+    deadline,
+  );
   expectStatus(data, 200, path);
   if (!data.contentType.toLowerCase().includes("text/html")) {
     throw new SmokeCheckError(
@@ -323,13 +412,15 @@ async function checkPublicPage(baseUrl: URL, path: string, timeoutMs: number) {
   }
 }
 
-export async function runSmokeCheck() {
-  const baseUrl = resolveBaseUrl();
-  const timeoutMs = resolveTimeoutMs();
+async function runSmokeCheckSteps(
+  baseUrl: URL,
+  timeoutMs: number,
+  deadline: SmokeDeadline,
+) {
   const passed: string[] = [];
 
   const health = requireRecord(
-    await checkJson(baseUrl, "/api/healthz", timeoutMs, 200),
+    await checkJson(baseUrl, "/api/healthz", timeoutMs, 200, deadline),
     "/api/healthz",
   );
   if (health.status !== "ok") {
@@ -338,7 +429,13 @@ export async function runSmokeCheck() {
   passed.push("/api/healthz");
 
   const clerkEnvironment = requireRecord(
-    await checkJson(baseUrl, "/api/__clerk/v1/environment", timeoutMs, 200),
+    await checkJson(
+      baseUrl,
+      "/api/__clerk/v1/environment",
+      timeoutMs,
+      200,
+      deadline,
+    ),
     "/api/__clerk/v1/environment",
   );
   const clerkAuthConfig = requireRecord(
@@ -362,7 +459,7 @@ export async function runSmokeCheck() {
   passed.push("/api/__clerk/v1/environment");
 
   const tutors = requireArray(
-    await checkJson(baseUrl, "/api/tutors", timeoutMs, 200),
+    await checkJson(baseUrl, "/api/tutors", timeoutMs, 200, deadline),
     "/api/tutors",
     "/api/tutors",
   );
@@ -394,6 +491,7 @@ export async function runSmokeCheck() {
     "/api/resources",
     timeoutMs,
     200,
+    deadline,
   );
   let resources: unknown[];
   if (Array.isArray(resourceCatalogue)) {
@@ -431,29 +529,35 @@ export async function runSmokeCheck() {
   passed.push("/api/resources");
 
   for (const path of ["/", "/resources", "/enquire"]) {
-    await checkPublicPage(baseUrl, path, timeoutMs);
+    await checkPublicPage(baseUrl, path, timeoutMs, deadline);
     passed.push(path);
   }
 
   const tutorSlug = parsedTutors[0].slug as string;
   const tutorPath = `/tutors/${encodeURIComponent(tutorSlug)}`;
-  await checkPublicPage(baseUrl, tutorPath, timeoutMs);
+  await checkPublicPage(baseUrl, tutorPath, timeoutMs, deadline);
   passed.push(tutorPath);
 
   const resourceSlug = parsedResources[0].slug as string;
   const resourcePath = `/resources/${encodeURIComponent(resourceSlug)}`;
-  await checkPublicPage(baseUrl, resourcePath, timeoutMs);
+  await checkPublicPage(baseUrl, resourcePath, timeoutMs, deadline);
   passed.push(resourcePath);
 
-  const invalidEnquiry = await request(baseUrl, "/api/enquiries", timeoutMs, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
+  const invalidEnquiry = await request(
+    baseUrl,
+    "/api/enquiries",
+    timeoutMs,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      // Deliberately fails validation before tutor lookup or database insertion.
+      body: JSON.stringify({}),
     },
-    // Deliberately fails validation before tutor lookup or database insertion.
-    body: JSON.stringify({}),
-  });
+    deadline,
+  );
   expectStatus(invalidEnquiry, 400, "POST /api/enquiries (invalid payload)");
   const invalidEnquiryBody = requireRecord(
     parseJson(invalidEnquiry, "POST /api/enquiries (invalid payload)"),
@@ -467,7 +571,7 @@ export async function runSmokeCheck() {
   passed.push("POST /api/enquiries (invalid payload)");
 
   const recoveryHealth = requireRecord(
-    await checkJson(baseUrl, "/api/healthz", timeoutMs, 200),
+    await checkJson(baseUrl, "/api/healthz", timeoutMs, 200, deadline),
     "/api/healthz after invalid enquiry",
   );
   if (recoveryHealth.status !== "ok") {
@@ -477,9 +581,23 @@ export async function runSmokeCheck() {
   }
   passed.push("/api/healthz after invalid enquiry");
 
+  deadline.assertAvailable("launch smoke check completion");
   console.log(`Launch smoke check passed for ${baseUrl.origin}`);
   for (const check of passed) {
     console.log(`  ✓ ${check}`);
+  }
+}
+
+export async function runSmokeCheck() {
+  const baseUrl = resolveBaseUrl();
+  const timeoutMs = resolveTimeoutMs();
+  const totalTimeoutMs = resolveTotalTimeoutMs();
+  const deadline = createSmokeDeadline(totalTimeoutMs);
+
+  try {
+    await runSmokeCheckSteps(baseUrl, timeoutMs, deadline);
+  } finally {
+    deadline.close();
   }
 }
 
