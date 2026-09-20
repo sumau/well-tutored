@@ -29,85 +29,24 @@ configuration this codebase currently supports.
 Plus a PostgreSQL database, hosted separately from the container — see
 **Database** below.
 
-## Configuration
+## Deploying, in order
 
-| Variable | When | Notes |
-| --- | --- | --- |
-| `DATABASE_URL` | runtime, required | Append `?sslmode=require` for a hosted database: `lib/db/src/index.ts` creates a bare `pg` pool with no SSL options of its own. |
-| `TRUSTED_ORIGINS` | runtime, required | The exact public origin, e.g. `https://well-tutored.fly.dev`. See below. |
-| `PORT` | runtime, required | The image defaults it to `8080`. |
-| `WEB_CLIENT_ROOT` | runtime, required here | The directory holding the frontend build; `docker/Dockerfile` sets it to `/app/web`. Leaving it unset makes the server skip serving the frontend entirely, which is what the Replit deployment relies on — so a container deployment that loses it answers every page with a 404 while `/api/healthz` stays green. It logs a warning in that state. |
-| `CLERK_SECRET_KEY` | runtime, required | Not optional: the Clerk middleware fails every `/api` request with a 500 when it is absent, public endpoints included. A production key enables the Clerk proxy and workspace sign-in; a syntactically valid placeholder (`sk_test_` + 32 characters, as in `.env.example`) is enough to serve the public site. |
-| `CLERK_PUBLISHABLE_KEY` | runtime | Used by the Clerk middleware. |
-| `VITE_CLERK_PUBLISHABLE_KEY` | **build**, as a build argument | Compiled into the browser bundle. Setting it at runtime has no effect. |
+Each step has its own section below; this is the order they have to happen in.
 
-`TRUSTED_ORIGINS` is the one that bites. On Replit, and only when
-`NODE_ENV=production`, `getTrustedOrigins` falls back to `REPLIT_DOMAINS`; off
-Replit that variable does not exist, and an empty trusted-origin set rejects
-every credentialed request — including the public enquiry POST, which is the
-main thing visitors do. Set it to the public origin, with no trailing path, and
-update it when the domain changes.
+1. **[Database](#database)** — create the Neon project, take the pooled and
+   direct connection strings.
+2. **[Apply the schema](#applying-the-schema)** — from this checkout, using the
+   direct string. Nothing does this for you.
+3. **[Clerk keys](#clerk-keys)** — a development instance, because you do not
+   control DNS for `*.fly.dev`.
+4. **[Deploy](#flyio)** — create the app, set the secrets, put the publishable
+   key in `fly.toml`, `fly deploy`.
+5. **Expect an empty site.** A fresh database has no tutors or resources, and
+   `smoke:launch` fails by design until it does — see
+   [Content](#content).
 
-`configuredValues` in `artifacts/api-server/src/middlewares/request-origin.ts`
-reads several names, and they are not interchangeable:
-
-- `TRUSTED_ORIGINS` and `CORS_ORIGINS` are the explicit tier. Either one being
-  set **replaces** everything below, so the deployment fails closed rather than
-  silently widening access.
-- `APP_ORIGIN`, `PUBLIC_APP_ORIGIN` and `PUBLIC_APP_URL` are consulted only when
-  neither of those is set. They are a fallback, not an alias: set
-  `TRUSTED_ORIGINS` as well and these are ignored entirely.
-- `REPLIT_DOMAINS` (production) and `REPLIT_DEV_DOMAIN` plus the localhost
-  defaults (everywhere else) sit below those again.
-
-Set `TRUSTED_ORIGINS` and ignore the rest.
-
-The public site does not need *working* Clerk keys, but it does need
-`CLERK_SECRET_KEY` to be present — see the table. With a placeholder, the
-directory, resources and enquiry flow all work and `/workspace` simply cannot be
-signed into. Pages themselves keep rendering either way, because the Clerk
-middleware is mounted under `/api` only.
-
-## Fly.io
-
-`fly.toml` is committed and points at `docker/Dockerfile`.
-
-Fly runs the container; Neon holds the database. Have the Neon connection
-string in hand before deploying — see **Database** below.
-
-```
-fly apps create well-tutored
-fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
-  CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
-```
-
-`fly launch --no-deploy` also works, but it rewrites the committed `fly.toml`
-from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
-`fly apps create` only reserves the name, which is all this repository needs.
-
-Then set `TRUSTED_ORIGINS` in `fly.toml` to the hostname you were allocated — it
-must match exactly, or every credentialed request is rejected, the public
-enquiry POST included — put the publishable key in `[build.args]`, apply the
-schema (below), and:
-
-```
-fly deploy
-```
-
-The health check is already pointed at `/api/healthz`.
-
-## Render, Railway, Cloud Run, or anything else
-
-The same image works anywhere that runs a container and injects environment
-variables. Build from the repository root — the Dockerfile copies the workspace,
-so `docker/` is the wrong build context:
-
-```
-docker build -f docker/Dockerfile --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_live_... -t well-tutored .
-```
-
-Point the platform's health check at `/api/healthz` and let it supply `PORT` if
-it insists on its own.
+Everything can be rehearsed first without deploying: see [Verifying the image
+locally](#verifying-the-image-locally).
 
 ## Database
 
@@ -157,8 +96,8 @@ Three things about that command:
   an explicit `environment:` entry beats anything from `.env`. Omit the
   override and you push to your local container instead of the deployment,
   successfully and silently.
-- **`?sslmode=require`** belongs on the connection string for any hosted
-  database, for the reason in the configuration table above.
+- **`?sslmode=require`** belongs on the connection string, for the reason given
+  under [Database](#database) above.
 - **Use Neon's direct connection string here**, not the pooled one — the
   `-pooler` hostname is the application's. Pooled connections are a poor fit for
   DDL.
@@ -177,6 +116,107 @@ docker compose run --rm -e DATABASE_URL='postgres://...' --entrypoint bash migra
 
 `tutors`, `resources`, `enquiries` and `workspace_accounts` should all be
 listed.
+
+## Clerk keys
+
+Which keys work depends on the hostname, and getting this wrong is the most
+common way a first deployment fails.
+
+`publishableKeyFromHost` decides this, and the SPA
+(`artifacts/well-tutored/src/app/config.ts`) and the API (`app.ts`) both call it:
+
+```js
+if (fallbackKey && isDevelopmentFromPublishableKey(fallbackKey)) return fallbackKey;
+return buildPublishableKey(`clerk.${hostname}`);
+```
+
+- A **development** key (`pk_test_…`) is used exactly as given, so Clerk is
+  reached at `<slug>.clerk.accounts.dev` whatever the hostname. This is the only
+  configuration that works on a hostname whose DNS you do not control, such as
+  `*.fly.dev`, and it needs no records and no proxy.
+- A **production** key (`pk_live_…`), or no key at all, is discarded: both sides
+  derive a key for `clerk.<hostname>` instead. That expects the CNAME a Clerk
+  production instance asks you to add, so it requires a domain of your own.
+
+So stand the deployment up on development keys, and move to a production
+instance when you attach a real domain — at which point `TRUSTED_ORIGINS`
+becomes that domain too. Development instances show a notice in the sign-in UI,
+share Clerk's OAuth credentials, and carry lower limits, so they are for getting
+the deployment working rather than for live traffic.
+
+## Fly.io
+
+`fly.toml` is committed and points at `docker/Dockerfile`.
+
+Fly runs the container; Neon holds the database. By this point the Neon
+project exists, the schema is pushed, and you have Clerk development keys — all
+three are prerequisites, not steps you can take afterwards.
+
+```
+fly apps create well-tutored
+fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
+  CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+`fly launch --no-deploy` also works, but it rewrites the committed `fly.toml`
+from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
+`fly apps create` only reserves the name, which is all this repository needs.
+
+Then set `TRUSTED_ORIGINS` in `fly.toml` to the hostname you were allocated — it
+must match exactly, or every credentialed request is rejected, the public
+enquiry POST included — put the publishable key in `[build.args]`, and:
+
+```
+fly deploy
+```
+
+The health check is already pointed at `/api/healthz`.
+
+**`VITE_CLERK_PUBLISHABLE_KEY` must be a build argument, not a secret.** Vite
+compiles it into the browser bundle, and a Fly secret exists only at runtime, so
+setting it with `fly secrets set` leaves the bundle holding the empty string and
+sign-in never initialises. It is a publishable key — public by design, shipped
+to every visitor — so committing it to `fly.toml` is expected, not a leak. The
+other three belong in `fly secrets` and not in this file.
+
+## Configuration reference
+
+| Variable | When | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | runtime, required | Append `?sslmode=require` for a hosted database: `lib/db/src/index.ts` creates a bare `pg` pool with no SSL options of its own. |
+| `TRUSTED_ORIGINS` | runtime, required | The exact public origin, e.g. `https://well-tutored.fly.dev`. See below. |
+| `PORT` | runtime, required | The image defaults it to `8080`. |
+| `WEB_CLIENT_ROOT` | runtime, required here | The directory holding the frontend build; `docker/Dockerfile` sets it to `/app/web`. Leaving it unset makes the server skip serving the frontend entirely, which is what the Replit deployment relies on — so a container deployment that loses it answers every page with a 404 while `/api/healthz` stays green. It logs a warning in that state. |
+| `CLERK_SECRET_KEY` | runtime, required | Not optional: the Clerk middleware fails every `/api` request with a 500 when it is absent, public endpoints included. A production key enables the Clerk proxy and workspace sign-in; a syntactically valid placeholder (`sk_test_` + 32 characters, as in `.env.example`) is enough to serve the public site. |
+| `CLERK_PUBLISHABLE_KEY` | runtime | Used by the Clerk middleware. |
+| `VITE_CLERK_PUBLISHABLE_KEY` | **build**, as a build argument | Compiled into the browser bundle. Setting it at runtime has no effect. |
+
+`TRUSTED_ORIGINS` is the one that bites. On Replit, and only when
+`NODE_ENV=production`, `getTrustedOrigins` falls back to `REPLIT_DOMAINS`; off
+Replit that variable does not exist, and an empty trusted-origin set rejects
+every credentialed request — including the public enquiry POST, which is the
+main thing visitors do. Set it to the public origin, with no trailing path, and
+update it when the domain changes.
+
+`configuredValues` in `artifacts/api-server/src/middlewares/request-origin.ts`
+reads several names, and they are not interchangeable:
+
+- `TRUSTED_ORIGINS` and `CORS_ORIGINS` are the explicit tier. Either one being
+  set **replaces** everything below, so the deployment fails closed rather than
+  silently widening access.
+- `APP_ORIGIN`, `PUBLIC_APP_ORIGIN` and `PUBLIC_APP_URL` are consulted only when
+  neither of those is set. They are a fallback, not an alias: set
+  `TRUSTED_ORIGINS` as well and these are ignored entirely.
+- `REPLIT_DOMAINS` (production) and `REPLIT_DEV_DOMAIN` plus the localhost
+  defaults (everywhere else) sit below those again.
+
+Set `TRUSTED_ORIGINS` and ignore the rest.
+
+The public site does not need *working* Clerk keys, but it does need
+`CLERK_SECRET_KEY` to be present — see the table. With a placeholder, the
+directory, resources and enquiry flow all work and `/workspace` simply cannot be
+signed into. Pages themselves keep rendering either way, because the Clerk
+middleware is mounted under `/api` only.
 
 ## Content
 
@@ -279,30 +319,6 @@ session, so a globally mounted Clerk would bounce every page load away from the
 app now that this server serves the HTML — under Replit's router it only ever saw
 API requests. The SPA authenticates client-side through `@clerk/react`.
 
-### Which Clerk keys work on which hostname
-
-`publishableKeyFromHost` decides this, and the SPA
-(`artifacts/well-tutored/src/app/config.ts`) and the API (`app.ts`) both call it:
-
-```js
-if (fallbackKey && isDevelopmentFromPublishableKey(fallbackKey)) return fallbackKey;
-return buildPublishableKey(`clerk.${hostname}`);
-```
-
-- A **development** key (`pk_test_…`) is used exactly as given, so Clerk is
-  reached at `<slug>.clerk.accounts.dev` whatever the hostname. This is the only
-  configuration that works on a hostname whose DNS you do not control, such as
-  `*.fly.dev`, and it needs no records and no proxy.
-- A **production** key (`pk_live_…`), or no key at all, is discarded: both sides
-  derive a key for `clerk.<hostname>` instead. That expects the CNAME a Clerk
-  production instance asks you to add, so it requires a domain of your own.
-
-So stand the deployment up on development keys, and move to a production
-instance when you attach a real domain — at which point `TRUSTED_ORIGINS`
-becomes that domain too. Development instances show a notice in the sign-in UI,
-share Clerk's OAuth credentials, and carry lower limits, so they are for getting
-the deployment working rather than for live traffic.
-
 The Frontend API proxy at `/api/__clerk` is a third path, and is not verified
 here. It also needs a production instance — it attributes requests by host and a
 dev instance answers `host_invalid` — and the frontend only routes through it
@@ -331,6 +347,19 @@ docker compose run --rm --entrypoint bash api -lc 'SMOKE_BASE_URL=http://prod:80
 It requests every public page with `Accept: text/html`, which is what caught the
 Clerk handshake redirect described above. The rest of the suite is unchanged:
 `docker compose run --rm test`, described in [local-docker.md](local-docker.md).
+
+## Render, Railway, Cloud Run, or anything else
+
+The same image works anywhere that runs a container and injects environment
+variables. Build from the repository root — the Dockerfile copies the workspace,
+so `docker/` is the wrong build context:
+
+```
+docker build -f docker/Dockerfile --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_live_... -t well-tutored .
+```
+
+Point the platform's health check at `/api/healthz` and let it supply `PORT` if
+it insists on its own.
 
 ## What stays behind
 
