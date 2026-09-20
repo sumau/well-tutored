@@ -1,0 +1,28 @@
+# Local development image for the Well Tutored workspace.
+#
+# glibc (bookworm), not Alpine: pnpm-workspace.yaml excludes every *-musl
+# native binary (lightningcss, @tailwindcss/oxide, rollup), so a musl base
+# cannot resolve the platform packages the lockfile expects.
+#
+# linux/amd64: the same overrides keep only the linux-x64 esbuild binary.
+FROM --platform=linux/amd64 node:24-bookworm-slim
+
+# pg_isready / psql for poking at the database from inside the container.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends postgresql-client ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Pinned to the version in the root package.json "packageManager" field, so
+# the image, Replit, and CI all resolve the same pnpm and leave pnpm-lock.yaml
+# alone. Keep the two in step when either moves.
+RUN npm install -g pnpm@10.34.5 && npm cache clean --force
+
+ENV PNPM_HOME=/home/node/.local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+# Pre-create the store path so the named volume mounted there inherits
+# node's ownership instead of root's.
+RUN mkdir -p $PNPM_HOME/store && chown -R node:node /home/node/.local
+
+WORKDIR /workspace
+USER node

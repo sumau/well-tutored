@@ -16,6 +16,11 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? '/';
 
+// Replit's router serves the frontend and the API from one origin, so the app
+// calls /api with relative paths. Locally the two run on separate ports, and
+// without this proxy /api falls through to Vite's history fallback.
+const apiProxyTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
+
 function bundleReport(): Plugin {
   let report: {
     generatedAt: string;
@@ -109,6 +114,14 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: {
+      // changeOrigin stays false so the browser's Origin header reaches the
+      // API unchanged; the API only trusts the frontend's own origin.
+      '/api': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
+    },
     fs: {
       strict: true,
     },

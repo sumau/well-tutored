@@ -45,6 +45,29 @@ If an external test URL is provided but is missing or the schema cannot be
 applied, validation stops with an actionable test-database error instead of
 falling back to the application database.
 
+## Credentials
+
+`pnpm run verify:ci` needs no Clerk credentials. The suite passes with
+`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, and `VITE_CLERK_PUBLISHABLE_KEY`
+all absent, so CI should not be given Clerk secrets, and the interactive
+`clerk auth login` flow has no place in it: that command authenticates a person
+through a browser, which CI does not have.
+
+Nothing in the suite reaches Clerk over the network. The workspace lifecycle
+tests replace `clerkClient.users.getUser` on its prototype and supply
+authentication through the `@clerk/express.auth` symbol, the web tests render
+under JSDOM, and `test:smoke` exercises the smoke scripts' own logic rather
+than launching them against a running host.
+
+The one check that depends on a live Clerk instance is the Frontend API proxy
+assertion in the launch smoke check, which runs against a deployment and uses
+that deployment's own managed keys rather than anything CI supplies.
+Development smoke skips it, because the API server enables the proxy only in
+production.
+
+The dedicated test database is therefore the only external dependency the
+deterministic gate has.
+
 ## Deployment gate
 
 The root deployment configuration runs the build-free

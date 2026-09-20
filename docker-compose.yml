@@ -1,0 +1,125 @@
+# Local development stack. Replit's router normally fronts both artifacts on a
+# single domain; here the Vite dev server proxies /api to the API service
+# instead (see artifacts/well-tutored/vite.config.ts).
+name: well-tutored
+
+x-node: &node
+  build:
+    context: ./docker
+    dockerfile: Dockerfile.dev
+  image: well-tutored-dev:latest
+  working_dir: /workspace
+  volumes:
+    - .:/workspace
+  # The store must share a filesystem with node_modules for pnpm to hardlink
+  # into it, and node_modules lives in the bind mount. A named volume would sit
+  # on a different device and be silently ignored, so keep the store in the
+  # repo (gitignored) where it persists between runs and stays fast.
+  environment:
+    PNPM_STORE_DIR: /workspace/.pnpm-store
+  # Optional: Clerk keys for the private /workspace area. The public site runs
+  # without them, so the file is not required.
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  # One-shot install. api and web wait for this so they never race on the
+  # shared node_modules tree in the bind mount.
+  deps:
+    <<: *node
+    command: pnpm install --frozen-lockfile
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: well_tutored
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d well_tutored"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  api:
+    <<: *node
+    environment:
+      PNPM_STORE_DIR: /workspace/.pnpm-store
+      PORT: "8080"
+      DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored
+      # Browser requests reach the API through the Vite proxy, so the origin
+      # the API sees is the web service's. Stated explicitly here because
+      # TRUSTED_ORIGINS replaces the built-in defaults rather than adding to
+      # them (artifacts/api-server/src/middlewares/request-origin.ts).
+      TRUSTED_ORIGINS: http://localhost:5173
+    ports:
+      - "8080:8080"
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    command: pnpm --filter @workspace/api-server run dev
+
+  web:
+    <<: *node
+    environment:
+      PNPM_STORE_DIR: /workspace/.pnpm-store
+      PORT: "5173"
+      API_PROXY_TARGET: http://api:8080
+    ports:
+      - "5173:5173"
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+    command: pnpm --filter @workspace/well-tutored run dev
+
+  # Schema push. Kept out of the default startup because drizzle-kit can
+  # prompt; run it with `docker compose run --rm migrate` so it gets a TTY.
+  migrate:
+    <<: *node
+    profiles: ["tools"]
+    environment:
+      PNPM_STORE_DIR: /workspace/.pnpm-store
+      DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    command: pnpm --filter @workspace/db run push
+
+  # Full CI suite. `verify:ci` builds a throwaway PostgreSQL cluster when
+  # TEST_DATABASE_URL is unset, which needs initdb and pg_ctl — server binaries
+  # the dev image does not carry, only the client ones. Supplying a dedicated
+  # connection takes the other branch of scripts/with-test-database.sh and
+  # reuses the db service instead.
+  #
+  # The test database must differ from the application one: lib/db/src/index.ts
+  # refuses a TEST_DATABASE_URL equal to DATABASE_URL, so integration tests can
+  # never mutate application data. Both are set here so that check is exercised
+  # rather than trivially satisfied by an absent DATABASE_URL.
+  test:
+    <<: *node
+    profiles: ["tools"]
+    environment:
+      PNPM_STORE_DIR: /workspace/.pnpm-store
+      DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored
+      TEST_DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored_test
+      PGPASSWORD: postgres
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    # drizzle-kit applies a schema but cannot create the database that holds
+    # it, so create it first. Repeat runs find it present and carry on.
+    command: bash -lc 'createdb -h db -U postgres well_tutored_test 2>/dev/null || true; pnpm run verify:ci'
+
+volumes:
+  pgdata:
