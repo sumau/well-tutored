@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
+    "verify:css": "node ./scripts/verify-css-build.mjs",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm --filter @workspace/api-server exec tsx --tsconfig ../well-tutored/tsconfig.json --test-concurrency=1 --test ../well-tutored/src/app/route-map.test.ts ../well-tutored/src/components/layout/WorkspaceAuthBoundary.test.tsx ../well-tutored/src/components/EnquiryForm.test.tsx ../well-tutored/src/lib/public-tutor-query.test.ts ../well-tutored/src/pages/TutorProfile.test.tsx ../well-tutored/src/pages/Home.test.tsx"
@@ -42,7 +43,6 @@
     "@replit/vite-plugin-cartographer": "catalog:",
     "@replit/vite-plugin-dev-banner": "catalog:",
     "@replit/vite-plugin-runtime-error-modal": "catalog:",
-    "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@types/jsdom": "^30.0.0",

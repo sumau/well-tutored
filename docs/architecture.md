@@ -98,3 +98,18 @@ Editing an already-published resource while keeping its status as `published`
 updates the public resource in place; changing it to `draft` removes it from
 public results while it is being revised. Resources do not currently keep a
 private draft alongside a live published version.
+
+## Styling payload
+
+The Well Tutored Vite build enables Tailwind's production Lightning CSS
+optimization. The primary stylesheet is currently 115,031 bytes raw and
+19,737 bytes gzip, with a budget of 115,200 raw and 19,800 gzip; run
+`pnpm --filter @workspace/well-tutored run build` followed by
+`pnpm --filter @workspace/well-tutored run verify:css` to verify the budget.
+
+The remaining global CSS is intentional: Tailwind preflight, theme variables,
+utilities used by both public and authenticated routes, motion states, and
+registered custom properties are shared so route transitions do not flash
+unstyled content. The authenticated route's separate CSS chunk is currently
+negligible; further savings would require splitting shared styles and
+reintroducing them during navigation.
