@@ -1,14 +1,4 @@
-# Weekly documentation review
-
-Run only against the **Well Tutored repository currently open in this Replit
-project**. The repository root is the directory containing:
-
-- `replit.md`
-- `docs/`
-- `artifacts/api-server/`
-- `artifacts/well-tutored/`
-- `lib/`
-- `scripts/`
+# Documentation review
 
 Review `replit.md` and every Markdown file matching `docs/**/*.md` against the
 current codebase in this same repository.
