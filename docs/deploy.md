@@ -142,9 +142,38 @@ docker compose run --rm -e DATABASE_URL='postgres://...' --entrypoint bash migra
   -lc 'pnpm --filter @workspace/db run push'
 ```
 
+This runs from your machine to the database. Secrets set on the deployment host
+play no part in it, so the connection string has to be supplied here.
+
+Three things about that command:
+
+- **`-e DATABASE_URL` is load-bearing.** `docker-compose.yml` sets
+  `DATABASE_URL` on the `migrate` service to the local development database, and
+  an explicit `environment:` entry beats anything from `.env`. Omit the
+  override and you push to your local container instead of the deployment,
+  successfully and silently.
+- **`?sslmode=require`** belongs on the connection string for any hosted
+  database, for the reason in the configuration table above.
+- **Prefer a direct connection over a pooled one** for DDL. Neon and Supabase
+  both hand out two URLs; the pooled endpoint (Neon marks it with `-pooler` in
+  the hostname) is the one for the running app. For Fly Managed Postgres, whose
+  `attach` sets the pooled URL, this is one more reason the push goes through
+  `fly mpg proxy` rather than the attached variable.
+
 `push` prompts before anything destructive — unlike the `push-force` the Replit
 hook uses. Read the prompt. Review the diff of `lib/db/src/schema/` first, as
-CLAUDE.md warns.
+CLAUDE.md warns. Against an empty database there is nothing to drop, so a prompt
+there means the connection string is not pointing where you think it is.
+
+Check what landed:
+
+```
+docker compose run --rm -e DATABASE_URL='postgres://...' --entrypoint bash migrate \
+  -lc 'psql "$DATABASE_URL" -c "\dt"'
+```
+
+`tutors`, `resources`, `enquiries` and `workspace_accounts` should all be
+listed.
 
 ## Content
 
