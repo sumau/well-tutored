@@ -10,6 +10,8 @@
     "smoke:launch": "pnpm --filter @workspace/scripts run smoke",
     "smoke:launch:published": "pnpm --filter @workspace/scripts run smoke:published",
     "smoke:launch:published:lifecycle": "pnpm --filter @workspace/scripts run smoke:published:lifecycle",
+    "smoke:enquiry": "pnpm --filter @workspace/scripts run smoke:enquiry",
+    "smoke:enquiry:published": "pnpm --filter @workspace/scripts run smoke:enquiry:published",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
