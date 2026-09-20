@@ -1,0 +1,92 @@
+# Deterministic repository verification, as defined by `pnpm run verify:ci`.
+# docs/ci-validation.md is the description of what that gate covers and why;
+# this file only supplies the environment it needs.
+#
+# Deliberately absent: the development and published smoke checks. They depend
+# on a live Replit development domain or deployment, so they stay where they
+# already run — the Replit `Project` workflow and the root `postpublish`
+# script. No Clerk credentials either: the suite is expected to pass with
+# CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, and VITE_CLERK_PUBLISHABLE_KEY all
+# absent, so giving CI secrets would weaken that guarantee rather than test it.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: verify:ci
+    # ubuntu-latest is linux-x64/glibc. pnpm-workspace.yaml prunes every other
+    # platform's native binaries (esbuild, lightningcss, @tailwindcss/oxide,
+    # rollup) from the lockfile, so an arm runner or a musl container could not
+    # resolve an install. Same constraint the dev image documents.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: well_tutored
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d well_tutored"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      # Both connections are set, and set differently, so lib/db/src/index.ts's
+      # refusal to run integration tests against the application database is
+      # exercised rather than trivially satisfied by an absent DATABASE_URL.
+      # Nothing writes to well_tutored; it exists to be the URL the guard
+      # compares against.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/well_tutored
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/well_tutored_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version here on purpose: the action reads the "packageManager" pin
+      # from package.json, which docker/Dockerfile.dev also tracks. One pin,
+      # three environments.
+      - uses: pnpm/action-setup@v4
+
+      # Must come after pnpm/action-setup so `cache: pnpm` can find the store.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Supplying TEST_DATABASE_URL takes the short branch of
+      # scripts/with-test-database.sh, which skips building a throwaway
+      # cluster. The database it names has to exist first: prepare:test-database
+      # applies a schema through drizzle-kit, which cannot create the database
+      # that holds it.
+      - name: Create the integration-test database
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -c 'CREATE DATABASE well_tutored_test'
+
+      # Runs the guard tests, the test-database checks, schema preparation, the
+      # API suite (including the database-backed workspace lifecycle tests), the
+      # web tests, the smoke-check tests, and finally `pnpm run build` — which
+      # is where docs:check and the full typecheck live, so a doc edit that
+      # would break the Replit deployment build fails here instead.
+      - name: Verify
+        run: pnpm run verify:ci

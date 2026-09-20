@@ -45,6 +45,29 @@ If an external test URL is provided but is missing or the schema cannot be
 applied, validation stops with an actionable test-database error instead of
 falling back to the application database.
 
+## GitHub Actions
+
+[.github/workflows/ci.yml](../.github/workflows/ci.yml) runs this same gate on
+every pull request and on pushes to `main`, so the check Replit registers is
+also the check that runs before a merge rather than only after one.
+
+The workflow supplies a `postgres:16` service container and points
+`TEST_DATABASE_URL` at a `well_tutored_test` database that it creates first.
+Supplying a connection takes the externally-provided branch of
+`scripts/with-test-database.sh`, so no throwaway cluster is built for the run.
+`DATABASE_URL` is set as well, to a different database on the same server, so
+the refusal to share a connection between application and integration-test data
+is exercised rather than vacuously satisfied by an absent value.
+
+Two environment constraints are load-bearing. The job runs on `ubuntu-latest`
+because it is linux-x64 with glibc, and `pnpm-workspace.yaml` prunes every other
+platform's native binaries from the lockfile. And pnpm is installed from the
+`packageManager` field rather than a version named in the workflow, so the pin
+that `docker/Dockerfile.dev` and the deployment build also depend on stays in
+one place.
+
+No Clerk credentials are configured for the workflow, for the reasons below.
+
 ## Credentials
 
 `pnpm run verify:ci` needs no Clerk credentials. The suite passes with
