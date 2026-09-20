@@ -1,0 +1,292 @@
+## Overview
+
+Review of the Well Tutored test suites, package scripts, `.replit` configuration,
+and the testing documentation, carried out on 2026-09-20 against commit `f1e25c2`.
+
+The suites were **not executed** during this review: `node_modules` is absent from
+this checkout and `DATABASE_URL` is unset. Every finding below comes from reading
+the code and configuration, with file and line references so each one can be
+confirmed directly.
+
+## What is working
+
+The layering is genuinely good for a Replit-built project:
+
+- Pure unit tests — `workspace-validation.test.ts`, `resource-types.test.ts`,
+  `request-origin.test.ts`.
+- A real HTTP + PostgreSQL integration suite — `workspace.lifecycle.test.ts`.
+- jsdom component tests — `Home.test.tsx`, `EnquiryForm.test.tsx`,
+  `WorkspaceAuthBoundary.test.tsx`.
+- A non-mutating launch smoke check, a Playwright browser check, and a
+  post-publish lifecycle check.
+
+The accessibility assertions in `EnquiryForm.test.tsx` — focus management,
+`aria-invalid`, announced errors, disabled-submit tab order — are better than most
+codebases have. Tying documentation to real package scripts through `docs-check`
+is a good idea.
+
+The problems are mostly about **what is not wired up** and **where the effort is
+pointed**, rather than about test quality.
+
+## 1. Test files are hand-listed, so new tests silently never run
+
+Every suite enumerates its files explicitly:
+
+- `artifacts/api-server/package.json:10` — 4 files
+- `artifacts/well-tutored/package.json:13` — 6 files
+- `scripts/package.json:15` — 2 files
+
+This has already failed. **`scripts/src/docs-check.test.ts` (249 lines) is
+referenced by no script anywhere in the repository** — it appears in no
+`package.json`, no `.md`, and no `.sh`. It has never run in CI. Meanwhile
+`docs/testing.md:66` states that "The documentation tests ensure documented
+`pnpm` commands refer to real package scripts", which is currently false.
+
+**Fix:** glob instead of enumerate — `tsx --test "src/**/*.test.ts"` (Node 24
+supports glob patterns for `--test`). `docs-check.test.ts` then runs by simply
+existing.
+
+## 2. The enquiry path has no server-side test
+
+`artifacts/api-server/src/routes/enquiries.ts` is 226 lines and **no test touches
+it**:
+
+- `enquiries.ts:88` — `POST /api/enquiries`
+- `enquiries.ts:131` — `GET /api/workspace/enquiries`
+- `enquiries.ts:170` — `POST /api/workspace/enquiries/:id/retry`
+
+`workspace.lifecycle.test.ts` never mentions enquiries. The Playwright check
+intercepts the endpoint (`enquiry-browser-smoke.ts:269`,
+`page.route("**/api/enquiries")`), so the end-to-end check never reaches the
+handler either. Nothing in the repository verifies that an enquiry is persisted,
+that `deliveryStatus` transitions pending → delivered/failed
+(`enquiries.ts:61-83`), or that retry works.
+
+By contrast the enquiry *form* is tested three times over: 595 lines of jsdom
+tests, a `TutorProfile` render test, and the browser smoke check.
+
+Also untested server-side:
+
+- `GET /api/resources` and `/api/resources/:slug` filtering and search
+  (`content.ts:155,220`).
+- All of saved-resources (`content.ts:284,314,349`).
+
+This is the highest-value gap. A handful of integration tests in the existing
+lifecycle style would cover it.
+
+## 3. Integration tests mutate a shared live database with no isolation
+
+`lib/db/src/index.ts` throws without `DATABASE_URL`, and the lifecycle suite
+cleans up by deleting rows matching fixed names
+(`workspace.lifecycle.test.ts:140-175` and `:217-252`). Consequences:
+
+- Tests cannot run on a fresh clone, offline, or in parallel; two concurrent runs
+  corrupt each other.
+- An aborted run leaves fixture rows behind.
+- `.replit` sets `build = ["pnpm", "run", "verify:deploy"]`, and `verify:deploy`
+  (`package.json:10`) begins with `pnpm --filter @workspace/api-server test` — so
+  **every publish runs DELETE and INSERT statements against a real database**.
+  See below.
+- The `Project` workflow runs `ci` and `dev-smoke` in parallel, so the suite
+  mutates the dev database while the smoke checks read it through the public API.
+  See finding 9.
+
+### The publish gate almost certainly runs these tests against production
+
+The split between `verify:ci` and `verify:deploy` is sound: `verify:ci` is the
+complete check including the build, and `verify:deploy` is build-free because the
+deployment system builds the production artifacts afterwards, avoiding a double
+build. The concern is not the gate or its design — it is which tests sit inside
+it.
+
+`lib/db/src/index.ts:8-12` throws when `DATABASE_URL` is unset. If the deployment
+build environment had no database, the api-server test step would fail on every
+publish and no version would ever go live. Since the app has been published —
+`SMOKE_PRODUCTION_URL = "https://welltutored.replit.app"` in
+`artifacts/well-tutored/.replit-artifact/artifact.toml`, plus the `postpublish`
+lifecycle check — `DATABASE_URL` must be set during the deployment build, and
+Replit deployment builds receive deployment secrets.
+
+The build also runs while the *currently deployed* version is still live and
+serving from that same database. And the lifecycle test does not only write
+private rows: at `workspace.lifecycle.test.ts:555-560` it publishes the test tutor
+and asserts that it appears in the public catalogue.
+
+```js
+const publicTutorsWithDraft = await request("/api/tutors");
+const publishedTutorWithDraft = publicTutorsWithDraft.body.find(
+  (tutor) => tutor.id === tutorId,
+);
+assert(publishedTutorWithDraft);
+```
+
+If that database is production, every publish inserts "Lifecycle Tutor" into the
+live public tutor catalogue for the duration of the test, where real visitors to
+the currently-deployed site can see it. Confirm which database the deployment
+build resolves before anything else in this document.
+
+**Fix:** a dedicated `TEST_DATABASE_URL`; per-test transaction rollback, or a
+unique run-scoped name prefix; and move the database-backed tests out of the
+deploy-time gate into the pre-publish step, where `verify:ci` already runs them.
+
+## 4. One test case is 520 lines
+
+`workspace.lifecycle.test.ts` is 1042 lines containing **4 `test()` calls**; the
+one beginning at line 261 runs to line 782. The first failing assertion hides
+everything after it, and the failure message identifies a 520-line block rather
+than a behaviour. Splitting into `describe` blocks with focused tests sharing
+setup keeps coverage identical and improves diagnostics substantially.
+
+## 5. The web suite borrows another package's toolchain
+
+```
+"test": "pnpm --filter @workspace/api-server exec tsx --tsconfig ../well-tutored/tsconfig.json ..."
+```
+
+The web tests run `tsx` from `@workspace/api-server` and reference their own files
+through `../well-tutored/…` (`artifacts/well-tutored/package.json:13`). The
+workaround is documented in `.agents/memory/web-artifact-component-tests.md`. Add
+`tsx` to the `artifacts/well-tutored` devDependencies and run it locally; the
+`--tsconfig` flag remains fine.
+
+## 6. No coverage measurement
+
+Nothing in the repository measures coverage, which is why finding 2 went
+unnoticed. `node --test --experimental-test-coverage` works with the existing
+runner and needs no new dependency.
+
+## 7. No lint or format gate
+
+`prettier` is a root devDependency (`package.json:26`) with no `format` or
+`format:check` script, and there is no ESLint or Biome configuration anywhere.
+`verify:ci` (`package.json:11`) is tests, typecheck, and build only. At minimum,
+add `prettier --check` to `verify:ci`.
+
+## 8. The Playwright check duplicates the jsdom tests without adding integration fidelity
+
+The browser smoke check asserts tab order, disabled submit, validation recovery,
+announced errors, retry, and receipt — the same list as `EnquiryForm.test.tsx` —
+but with the network mocked. It costs a Chromium launch and a live deployment,
+and buys only "a real browser agrees with jsdom".
+
+Pick one of two directions:
+
+- Trim the Playwright check to what jsdom genuinely cannot verify: native Tab
+  ordering, real focus semantics, actual CSS layout.
+- Or let it hit a real endpoint against a non-production target, so it validates
+  the integration the unit tests cannot.
+
+## 9. `verify:ci` is committed, but nothing triggers it on push or merge
+
+`.replit` does commit the gate, as a validation workflow:
+
+```toml
+[[workflows.workflow]]
+name = "ci"
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run verify:ci"
+[workflows.workflow.metadata]
+isValidation = true
+```
+
+So the definition is source-controlled and reproducible for anyone opening the
+Repl. Note that this makes `docs/ci-validation.md:26-29` stale: it states that the
+`ci` registration is "workspace-level configuration, not a file committed to this
+repository", while `.replit` commits exactly such a workflow. Either two separate
+mechanisms exist and the documentation does not distinguish them, or the line
+predates the `.replit` entry. `docs:check` cannot catch this, because it only
+validates `pnpm` command names.
+
+What is missing is the trigger. A Replit workflow fires from the Run button or the
+agent's validation system — not from a git push, a pull request, or a merge. The
+only automated merge-time hook is `scripts/post-merge.sh`:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @workspace/db run push-force
+```
+
+That is a force schema push with no tests at all. The merge path therefore has
+zero verification, and the gate depends on a person pressing Run in one specific
+environment.
+
+A GitHub Actions workflow running `verify:ci` against a PostgreSQL service
+container would give the gate an automatic trigger, and would survive a move away
+from Replit.
+
+### The `Project` workflow runs `ci` and `dev-smoke` in parallel
+
+```toml
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ci"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "dev-smoke"
+```
+
+Two consequences:
+
+- **Both run against the same database at once.** `ci` runs the lifecycle suite,
+  which inserts and deletes tutors and resources in the dev PostgreSQL instance,
+  while `dev-smoke` reads that same data through the public API. The smoke check
+  shape-validates *every* tutor in `/api/tutors` and its resources
+  (`smoke-check.ts:495-509`) and asserts pagination totals against item counts
+  (`smoke-check.ts:531-543`), so transient test rows fall inside the assertion
+  surface. In fairness, the obvious break is unlikely: new tutors receive
+  `sortOrder = tutorCount` (`workspace-tutors.ts:97`) and so sort after the five
+  seed tutors, while both smoke checks select the first match
+  (`smoke-check.ts:561`, `enquiry-browser-smoke.ts:100`). This is an unnecessary
+  coupling that will bite eventually rather than a guaranteed failure — and a
+  second, independent argument for the isolated test database in finding 3.
+- **It contradicts the documented sequence.** `docs/ci-validation.md:83-85`
+  prescribes: run `ci`, then start or refresh the API and web workflows, then run
+  `dev-smoke`. The committed `Project` workflow runs the first and third steps
+  simultaneously and never performs the second — the artifact dev servers come
+  from the managed artifact system (`artifacts/*/.replit-artifact/artifact.toml`),
+  started independently of `[workflows]`. So `dev-smoke` can begin before the dev
+  servers are listening. The `test -n "$REPLIT_DEV_DOMAIN"` guard covers a missing
+  domain, but not a domain whose servers are not yet up.
+
+Running the two sequentially, or pointing `ci` at an isolated test database, would
+remove both problems.
+
+## 10. Smaller items
+
+- `route-map.test.ts:37` onwards deep-equals full marketing copy strings, so a
+  copy edit fails a routing test. Assert invariants instead — every public path
+  has a title, titles end with `| Well Tutored` — and keep exact strings only
+  where SEO genuinely depends on them.
+- `scripts/post-merge.sh` runs `drizzle-kit push-force` on every merge, and no
+  test covers schema compatibility. A force push can drop columns with nothing to
+  catch it. It is also the only automated merge-time hook, and it runs no tests —
+  see finding 9.
+- **The CSS budget is enforced by nothing.** `verify:css` is defined at
+  `artifacts/well-tutored/package.json:10` and documented at
+  `docs/architecture.md:108`, but appears in neither `verify:ci`, `verify:deploy`,
+  nor `.replit`. The budget is `115_200` raw bytes
+  (`artifacts/well-tutored/scripts/verify-css-build.mjs:30`) and architecture.md
+  records the current stylesheet at 115,031 — 169 bytes of headroom, checked only
+  when somebody remembers. The production build already runs at deploy time, so
+  chaining `verify:css` after the web artifact build costs nothing.
+- `mockup-sandbox` (65 TypeScript files, no tests) is correctly scoped as
+  typecheck-only. No action needed.
+
+## Suggested order
+
+1. Confirm which database the deployment build resolves (finding 3). If it is
+   production, fix that before anything else here.
+2. Glob test discovery, and get `docs-check.test.ts` running. Small, and unblocks
+   everything else.
+3. Integration tests for `enquiries.ts` — create, list, retry, and delivery-status
+   transitions.
+4. Test-database isolation, and remove the database tests from the deploy build
+   step.
+5. Turn on `--experimental-test-coverage`, and use it to find the next gap rather
+   than guessing.
+6. Split the 520-line lifecycle test.
+7. Add `prettier --check` to `verify:ci`, and add a GitHub Actions workflow.
