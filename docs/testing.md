@@ -4,6 +4,9 @@ The project uses several complementary test layers. Most automated tests use
 Node's built-in `node:test` runner and are executed with `tsx`; the web tests
 also use JSDOM where browser APIs are needed.
 
+For the complete pre-publish validation setup, including Replit validation
+commands, see [CI and pre-publish validation](ci-validation.md).
+
 ## Test suites
 
 ### API server
