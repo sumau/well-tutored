@@ -30,14 +30,18 @@ or a published URL.
 The `ci` validation command is also registered in Replit's validation system
 with `pnpm run verify:ci`. The registration is workspace-level configuration,
 not a file committed to this repository, so keep `verify:ci` in the root
-`package.json` as the source-controlled definition of the check.
+`package.json` as the source-controlled definition of the check. The command
+uses an externally supplied `TEST_DATABASE_URL` when one is available.
+Otherwise, it provisions a temporary local PostgreSQL cluster for the run,
+exports its separate connection as `TEST_DATABASE_URL`, and removes the
+cluster when validation finishes. It never falls back to `DATABASE_URL`.
 
 CI is the only automated validation path that runs the database-backed API
 integration suite. Those tests create, update, publish, and delete test
 records, so they must use an isolated test database rather than a live
-environment. The `ci` workflow requires `TEST_DATABASE_URL`, rejects a value
-equal to `DATABASE_URL`, and applies the current schema to the test connection
-before the API suite starts. If the variable is missing or the schema cannot be
+environment. The `ci` workflow rejects a value equal to `DATABASE_URL` and
+applies the current schema to the test connection before the API suite starts.
+If an external test URL is provided but is missing or the schema cannot be
 applied, validation stops with an actionable test-database error instead of
 falling back to the application database.
 
