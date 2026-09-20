@@ -170,11 +170,36 @@ session, so a globally mounted Clerk would bounce every page load away from the
 app now that this server serves the HTML — under Replit's router it only ever saw
 API requests. The SPA authenticates client-side through `@clerk/react`.
 
-The Clerk Frontend API proxy at `/api/__clerk` needs a **production** Clerk
-instance: it attributes requests by host, and a dev instance rejects one with
-`host_invalid`. That is the middleware's own documented limitation, not a
-deployment problem, but it does mean workspace sign-in can only be verified on
-the real domain with production keys. The public site does not touch it.
+### Which Clerk keys work on which hostname
+
+`publishableKeyFromHost` decides this, and the SPA
+(`artifacts/well-tutored/src/app/config.ts`) and the API (`app.ts`) both call it:
+
+```js
+if (fallbackKey && isDevelopmentFromPublishableKey(fallbackKey)) return fallbackKey;
+return buildPublishableKey(`clerk.${hostname}`);
+```
+
+- A **development** key (`pk_test_…`) is used exactly as given, so Clerk is
+  reached at `<slug>.clerk.accounts.dev` whatever the hostname. This is the only
+  configuration that works on a hostname whose DNS you do not control, such as
+  `*.fly.dev`, and it needs no records and no proxy.
+- A **production** key (`pk_live_…`), or no key at all, is discarded: both sides
+  derive a key for `clerk.<hostname>` instead. That expects the CNAME a Clerk
+  production instance asks you to add, so it requires a domain of your own.
+
+So stand the deployment up on development keys, and move to a production
+instance when you attach a real domain — at which point `TRUSTED_ORIGINS`
+becomes that domain too. Development instances show a notice in the sign-in UI,
+share Clerk's OAuth credentials, and carry lower limits, so they are for getting
+the deployment working rather than for live traffic.
+
+The Frontend API proxy at `/api/__clerk` is a third path, and is not verified
+here. It also needs a production instance — it attributes requests by host and a
+dev instance answers `host_invalid` — and the frontend only routes through it
+when `VITE_CLERK_PROXY_URL` is set, which nothing in this repository does, while
+the API's `clerkMiddleware` passes no matching `proxyUrl`. Treat wiring it up as
+work, not configuration.
 
 ## Verifying the image locally
 
