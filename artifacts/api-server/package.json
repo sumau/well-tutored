@@ -9,7 +9,7 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "tsx --test src/lib/resource-types.test.ts src/domain/workspace-validation.test.ts src/middlewares/request-origin.test.ts",
-    "test:integration": "tsx --test src/routes/workspace.lifecycle.test.ts",
+    "test:integration": "NODE_ENV=test tsx --test src/routes/workspace.lifecycle.test.ts",
     "test:deploy": "pnpm run test:unit",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

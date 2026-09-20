@@ -7,3 +7,4 @@
 - [JSDOM page test harness](jsdom-page-test-harness.md) — install global location/history/event listeners when rendering Wouter pages with tsx and JSDOM.
 - [Development smoke checks](development-smoke-checks.md) — dev Clerk proxying is intentionally disabled, so dev smoke must use explicit target mode and skip only that production assertion.
 - [Deployment build database target](deployment-build-database-target.md) — this project's deployment pre-build command receives the production PostgreSQL database.
+- [Clean integration fixtures](clean-integration-fixtures.md) — lifecycle tests must create every baseline row they assert against; isolated databases do not contain application seed data.

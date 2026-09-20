@@ -11,6 +11,7 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` for PostgreSQL access; `VITE_CLERK_PUBLISHABLE_KEY` for the Well Tutored frontend; and `CLERK_PUBLISHABLE_KEY` for the API's Clerk middleware
+- Integration tests require a separate `TEST_DATABASE_URL`. The integration test script sets `NODE_ENV=test`, so the database package uses `TEST_DATABASE_URL` only for that process, rejects a missing test URL, and rejects a test URL identical to `DATABASE_URL`. CI must provision the test database with the current schema before running `pnpm --filter @workspace/api-server run test:integration`.
 - Production-only API env: `CLERK_SECRET_KEY` enables the Clerk Frontend API proxy used by the production deployment. It is not required for development previews.
 
 ## Stack

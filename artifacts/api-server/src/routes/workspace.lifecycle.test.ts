@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import http from "node:http";
 import test, { after, before } from "node:test";
@@ -21,24 +22,40 @@ import contentRouter from "./content";
 import workspaceRouter from "./workspace";
 import { PUBLIC_TUTOR_CACHE_CONTROL } from "../lib/public-tutors";
 
-const ownerUserId = "workspace-lifecycle-owner";
-const pendingUserId = "workspace-lifecycle-pending";
-const nonOwnerUserId = "workspace-lifecycle-non-owner";
-const autoProvisionUserId = "workspace-lifecycle-auto-provision";
-const ownerAliasUserId = "workspace-lifecycle-owner-alias";
-const legacyAliasTutorUserId = "workspace-lifecycle-legacy-alias";
-const tutorName = "Lifecycle Tutor";
-const secondTutorName = "Lifecycle Tutor Two";
-const pendingTutorName = "Lifecycle Pending";
-const autoProvisionTutorName = "Auto Provision Tutor";
-const legacyAliasTutorName = "Legacy Alias Tutor";
+const runId = randomUUID().replaceAll("-", "").slice(0, 12);
+const ownerUserId = `workspace-lifecycle-owner-${runId}`;
+const pendingUserId = `workspace-lifecycle-pending-${runId}`;
+const nonOwnerUserId = `workspace-lifecycle-non-owner-${runId}`;
+const autoProvisionUserId = `workspace-lifecycle-auto-provision-${runId}`;
+const ownerAliasUserId = `workspace-lifecycle-owner-alias-${runId}`;
+const legacyAliasTutorUserId = `workspace-lifecycle-legacy-alias-${runId}`;
+const ownerEmail = `lifecycle-owner-${runId}@example.test`;
+const pendingEmail = `lifecycle-pending-${runId}@example.test`;
+const updatedPendingEmail = `lifecycle-pending-updated-${runId}@example.test`;
+const nonOwnerEmail = `lifecycle-non-owner-${runId}@example.test`;
+const autoProvisionEmail = `auto-provision-${runId}@example.test`;
+const legacyAliasEmail = `legacy-alias-${runId}@example.test`;
+const tutorName = `Lifecycle Tutor ${runId}`;
+const secondTutorName = `Lifecycle Tutor Two ${runId}`;
+const pendingTutorName = `Lifecycle Pending ${runId}`;
+const autoProvisionTutorName = `Auto Provision Tutor ${runId}`;
+const legacyAliasTutorName = `Legacy Alias Tutor ${runId}`;
+const tutorSlug = `lifecycle-tutor-${runId}`;
+const secondTutorSlug = `lifecycle-tutor-two-${runId}`;
+const titleOnlyDraftTitle = `Lifecycle title-only draft ${runId}`;
+const lifecycleResourceTitle = `Lifecycle resource ${runId}`;
+const legacyAliasDraftTitle = `Legacy alias tutor draft ${runId}`;
+const legacyAliasEditTitle = `Legacy alias tutor edit ${runId}`;
+const ownerDeletedResourceTitle = `Legacy alias owner delete ${runId}`;
+const testTint = `#${runId.slice(0, 6)}`;
+const baselineTutorTint = `#${runId.slice(6, 12)}`;
 const clerkEmailByUserId = new Map<string, string>([
-  [ownerUserId, "lifecycle-owner@example.test"],
-  [pendingUserId, "lifecycle-pending@example.test"],
-  [nonOwnerUserId, "lifecycle-non-owner@example.test"],
-  [autoProvisionUserId, "auto-provision@example.test"],
-  [ownerAliasUserId, "lifecycle-owner@example.test"],
-  [legacyAliasTutorUserId, "legacy-alias@example.test"],
+  [ownerUserId, ownerEmail],
+  [pendingUserId, pendingEmail],
+  [nonOwnerUserId, nonOwnerEmail],
+  [autoProvisionUserId, autoProvisionEmail],
+  [ownerAliasUserId, ownerEmail],
+  [legacyAliasTutorUserId, legacyAliasEmail],
 ]);
 const clerkUsersPrototype = Object.getPrototypeOf(clerkClient.users) as {
   getUser: typeof clerkClient.users.getUser;
@@ -103,7 +120,7 @@ const tutorInput = {
   style: "Calm, structured, question-led",
   rate: 42,
   availability: "accepting",
-  tint: "#C7D5C5",
+  tint: testTint,
 };
 
 before(async () => {
@@ -177,34 +194,56 @@ before(async () => {
       ]),
     );
 
+  await db.insert(tutorsTable).values({
+    slug: secondTutorSlug,
+    profileStatus: "published",
+    name: secondTutorName,
+    firstName: "Lifecycle",
+    lastName: "Tutor Two",
+    initials: "LTT",
+    subject: "English",
+    university: "University of Bristol",
+    qualification: "First-class BA (Hons), English",
+    bio: "A supportive English tutor for this isolated lifecycle run.",
+    style: "Clear, encouraging, structured",
+    teachingPoints: [
+      { title: "Clarity", body: "We make difficult texts easier to understand." },
+      { title: "Practice", body: "We build confidence through focused questions." },
+      { title: "Progress", body: "We adapt lessons to each student's goals." },
+    ],
+    rate: "40",
+    availability: "accepting",
+    tint: baselineTutorTint,
+  });
+
   await db.insert(workspaceAccountsTable).values([
     {
       clerkUserId: ownerUserId,
-      email: "lifecycle-owner@example.test",
+      email: ownerEmail,
       displayName: "Lifecycle Owner",
       role: "owner",
     },
     {
       clerkUserId: pendingUserId,
-      email: "lifecycle-pending@example.test",
-      displayName: "Lifecycle Pending",
+      email: pendingEmail,
+      displayName: pendingTutorName,
       role: "pending",
     },
     {
       clerkUserId: nonOwnerUserId,
-      email: "lifecycle-non-owner@example.test",
+      email: nonOwnerEmail,
       displayName: "Lifecycle Non-owner",
       role: "pending",
     },
     {
       clerkUserId: autoProvisionUserId,
-      email: "auto-provision@example.test",
+      email: autoProvisionEmail,
       displayName: autoProvisionTutorName,
       role: "pending",
     },
     {
       clerkUserId: legacyAliasTutorUserId,
-      email: "legacy-alias@example.test",
+      email: legacyAliasEmail,
       displayName: legacyAliasTutorName,
       role: "pending",
     },
@@ -280,7 +319,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   assert.equal(created.response.status, 201);
   assert.equal(created.body.name, tutorName);
   assert.equal(typeof created.body.id, "number");
-  assert.equal(created.body.slug, "lifecycle-tutor");
+  assert.equal(created.body.slug, tutorSlug);
 
   const tutorId = created.body.id as number;
   const publicTutors = await request("/api/tutors");
@@ -298,7 +337,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   assert.equal(accounts.response.status, 200);
   const pendingAccount = accounts.body.find(
     (account: { email: string }) =>
-      account.email === "lifecycle-pending@example.test",
+      account.email === pendingEmail,
   );
   assert(pendingAccount);
   assert.equal(pendingAccount.role, "pending");
@@ -321,12 +360,12 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     "/api/workspace/articles",
     {
       method: "POST",
-      body: JSON.stringify({ title: "Lifecycle title-only draft" }),
+      body: JSON.stringify({ title: titleOnlyDraftTitle }),
     },
     pendingUserId,
   );
   assert.equal(titleOnlyDraft.response.status, 201);
-  assert.equal(titleOnlyDraft.body.title, "Lifecycle title-only draft");
+  assert.equal(titleOnlyDraft.body.title, titleOnlyDraftTitle);
   assert.equal(titleOnlyDraft.body.status, "draft");
   assert.equal(titleOnlyDraft.body.subject, "");
   assert.equal(titleOnlyDraft.body.body, "");
@@ -347,7 +386,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     true,
   );
 
-  clerkEmailByUserId.set(pendingUserId, "lifecycle-pending-updated@example.test");
+  clerkEmailByUserId.set(pendingUserId, updatedPendingEmail);
   const pendingSessionAfterEmailChange = await request(
     "/api/workspace/me",
     {},
@@ -364,7 +403,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     (account: { tutorId: number | null }) => account.tutorId === tutorId,
   );
   assert(updatedPendingAccount);
-  assert.equal(updatedPendingAccount.email, "lifecycle-pending-updated@example.test");
+  assert.equal(updatedPendingAccount.email, updatedPendingEmail);
 
   const workspaceTutors = await request("/api/workspace/tutors", {}, ownerUserId);
   assert.equal(workspaceTutors.response.status, 200);
@@ -497,7 +536,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   assert.equal(publishedProfile.response.status, 200);
   assert.equal(publishedProfile.body.profileStatus, "published");
 
-  const publicTutorProfile = await request("/api/tutors/lifecycle-tutor");
+  const publicTutorProfile = await request(`/api/tutors/${tutorSlug}`);
   assert.equal(publicTutorProfile.response.status, 200);
   assert.equal(
     publicTutorProfile.response.headers.get("cache-control"),
@@ -653,7 +692,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
     {
       method: "POST",
       body: JSON.stringify({
-         title: "Lifecycle resource",
+         title: lifecycleResourceTitle,
         subject: "History",
         level: "GCSE",
         type: "Guide",
@@ -661,7 +700,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
          excerpt: "A short resource created to verify the tutor delete cascade.",
          body: "This resource exists only to confirm that tutor deletion removes related content.",
         sections: [],
-        tint: "#C7D5C5",
+        tint: testTint,
       }),
     },
     pendingUserId,
@@ -746,7 +785,7 @@ test("owner tutor lifecycle works end to end and remains owner-only", async () =
   assert.equal(pendingSessionAfterDelete.body.role, "tutor");
   assert.equal(pendingSessionAfterDelete.body.tutor.profileStatus, "draft");
   assert.equal(pendingSessionAfterDelete.body.tutor.firstName, "Lifecycle");
-  assert.equal(pendingSessionAfterDelete.body.tutor.lastName, "Pending");
+  assert.equal(pendingSessionAfterDelete.body.tutor.lastName, `Pending ${runId}`);
 
   const nonOwnerAccount = await db
     .select({ id: workspaceAccountsTable.id })
@@ -797,7 +836,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
 
   const accounts = await request("/api/workspace/accounts", {}, ownerUserId);
   const tutorAccount = accounts.body.find(
-    (account: { email: string }) => account.email === "legacy-alias@example.test",
+    (account: { email: string }) => account.email === legacyAliasEmail,
   );
   assert(tutorAccount);
 
@@ -815,7 +854,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
     "/api/workspace/articles",
     {
       method: "POST",
-      body: JSON.stringify({ title: "Legacy alias tutor draft" }),
+      body: JSON.stringify({ title: legacyAliasDraftTitle }),
     },
     legacyAliasTutorUserId,
   );
@@ -864,7 +903,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
     `/api/workspace/articles/${tutorResourceId}`,
     {
       method: "PATCH",
-      body: JSON.stringify({ title: "Legacy alias tutor edit" }),
+      body: JSON.stringify({ title: legacyAliasEditTitle }),
     },
     legacyAliasTutorUserId,
   );
@@ -873,7 +912,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
     tutorUpdate.body,
   );
   assert.equal(updatedByTutor.id, tutorResourceId);
-  assert.equal(updatedByTutor.title, "Legacy alias tutor edit");
+  assert.equal(updatedByTutor.title, legacyAliasEditTitle);
 
   const ownerUpdate = await request(
     `/api/workspace/articles/${tutorResourceId}`,
@@ -912,7 +951,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
     "/api/workspace/articles",
     {
       method: "POST",
-      body: JSON.stringify({ title: "Legacy alias owner delete" }),
+      body: JSON.stringify({ title: ownerDeletedResourceTitle }),
     },
     legacyAliasTutorUserId,
   );
@@ -967,7 +1006,7 @@ test("legacy articles alias supports list, edit, and delete permissions", async 
 test("approved tutor receives a private draft on first workspace sign-in", async () => {
   const accounts = await request("/api/workspace/accounts", {}, ownerUserId);
   const account = accounts.body.find(
-    (item: { email: string }) => item.email === "auto-provision@example.test",
+    (item: { email: string }) => item.email === autoProvisionEmail,
   );
   assert(account);
   assert.equal(account.role, "pending");
@@ -1019,7 +1058,7 @@ test("verified email reuses an existing workspace account across Clerk identitie
       clerkUserId: workspaceAccountsTable.clerkUserId,
     })
     .from(workspaceAccountsTable)
-    .where(eq(workspaceAccountsTable.email, "lifecycle-owner@example.test"));
+    .where(eq(workspaceAccountsTable.email, ownerEmail));
   assert.equal(originalAccount.length, 1);
   assert.equal(originalAccount[0].clerkUserId, ownerUserId);
 
@@ -1030,7 +1069,7 @@ test("verified email reuses an existing workspace account across Clerk identitie
   );
   assert.equal(aliasedSession.response.status, 200);
   assert.equal(aliasedSession.body.id, originalAccount[0].id);
-  assert.equal(aliasedSession.body.email, "lifecycle-owner@example.test");
+  assert.equal(aliasedSession.body.email, ownerEmail);
 
   const matchingAccounts = await db
     .select({
@@ -1038,6 +1077,6 @@ test("verified email reuses an existing workspace account across Clerk identitie
       clerkUserId: workspaceAccountsTable.clerkUserId,
     })
     .from(workspaceAccountsTable)
-    .where(eq(workspaceAccountsTable.email, "lifecycle-owner@example.test"));
+    .where(eq(workspaceAccountsTable.email, ownerEmail));
   assert.deepEqual(matchingAccounts, originalAccount);
 });
