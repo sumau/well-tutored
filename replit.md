@@ -9,7 +9,8 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL`, Clerk-managed auth variables, and `SESSION_SECRET`
+- Required env: `DATABASE_URL` for PostgreSQL access; `VITE_CLERK_PUBLISHABLE_KEY` for the Well Tutored frontend; and `CLERK_PUBLISHABLE_KEY` for the API's Clerk middleware
+- Production-only API env: `CLERK_SECRET_KEY` enables the Clerk Frontend API proxy used by the production deployment. It is not required for development previews.
 
 ## Stack
 

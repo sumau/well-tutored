@@ -15,6 +15,28 @@ check another published domain, override it explicitly:
 SMOKE_BASE_URL=https://example.replit.app pnpm smoke:launch
 ```
 
+## Timeout controls
+
+The smoke check applies a timeout to each request and an overall deadline to
+the complete check:
+
+- `SMOKE_TIMEOUT_MS` — per-request timeout. Defaults to `15000` ms and accepts
+  integer values from `100` through `60000` ms.
+- `SMOKE_TOTAL_TIMEOUT_MS` — overall launch-check timeout. Defaults to `60000`
+  ms and accepts integer values from `1000` through `300000` ms.
+
+When a published target is intentionally slower, override the relevant values
+for that run. Increase the overall timeout as well if the complete sequence
+needs more time:
+
+```sh
+SMOKE_TIMEOUT_MS=30000 SMOKE_TOTAL_TIMEOUT_MS=120000 pnpm smoke:launch
+```
+
+These controls do not disable the checks or allow requests to continue past the
+overall deadline. Values outside the supported ranges, or values that are not
+whole numbers of milliseconds, fail before requests are made.
+
 The root package also registers a `postpublish` lifecycle hook. It runs the
 strict published-target variant automatically. The lifecycle receives the URL
 reported by the current Publishing run through `REPLIT_PUBLISHED_URL` and

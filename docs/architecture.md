@@ -19,20 +19,30 @@ the public visual language. Public API handlers live in
 `artifacts/api-server/src/routes/content.ts` and
 `artifacts/api-server/src/routes/enquiries.ts`.
 
+## Authentication
+
+Clerk provides the sign-in and sign-up pages:
+
+- `/sign-in` — sign-in flow (including Clerk's nested flow paths)
+- `/sign-up` — sign-up flow (including Clerk's nested flow paths)
+
 ## Workspace
 
 Workspace routes are protected by Clerk and the workspace account boundary:
 
 - `/workspace` — dashboard
+- `/workspace/enquiries` — workspace enquiry list and retry actions
 - `/workspace/profile` — tutor profile drafts and publishing
-- `/workspace/resources/...` — resource drafts and publishing
+- `/workspace/resources/new` — create a resource
+- `/workspace/resources/:id` — edit a resource
 - `/workspace/tutors` — owner-only tutor profile management
 - `/workspace/accounts` — owner-only account approval and tutor assignment
 
-`/workspace/articles/...` remains a compatibility alias and redirects to the
-canonical resource URLs. Workspace accounts are stored in the
-`workspace_accounts` table; the existing `studio_account_role` enum remains a
-legacy database identifier to avoid an unnecessary second schema migration.
+`/workspace/articles/new` and `/workspace/articles/:id` remain compatibility
+aliases and redirect to the canonical resource URLs. Workspace accounts are
+stored in the `workspace_accounts` table; the existing `studio_account_role`
+enum remains a legacy database identifier to avoid an unnecessary second schema
+migration.
 
 ## API boundaries
 
@@ -47,8 +57,18 @@ Workspace code is split by responsibility:
 - `presenters/resource-presenter.ts` — resource response mapping and joined
   resource lookup
 - `presenters/tutor-presenter.ts` — tutor response mapping and draft overlay
-- `routes/workspace.ts` — HTTP validation, route orchestration, and database
+- `routes/workspace.ts` — composition point that mounts the workspace subrouters;
+  it does not contain all workspace validation or database mutations
+- `routes/workspace-session.ts` — workspace session and current-account
+  endpoints
+- `routes/workspace-resources.ts` — resource request validation and resource
   mutations
+- `routes/workspace-profile.ts` — tutor profile request validation and profile
+  mutations
+- `routes/workspace-tutors.ts` — owner-only tutor management
+- `routes/workspace-accounts.ts` — owner-only workspace account management
+- `routes/enquiries.ts` — public enquiry creation and workspace enquiry list and
+  retry handlers
 
 The intended direction for future workspace changes is to keep route handlers
 thin: authenticate, validate the request, call a domain/service function, and

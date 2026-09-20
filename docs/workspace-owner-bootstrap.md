@@ -40,7 +40,7 @@ one-time provisioning step, not application startup behavior.
     Supply the intended owner email as the parameter. The table is named
     `workspace_accounts` to match the application vocabulary.
 
-6. Sign in again and open the Workspace. The new owner can then approve users,
+5. Sign in again and open the Workspace. The new owner can then approve users,
    assign tutor profiles, and manage Workspace content through the UI.
 
 ## Safety rules
