@@ -3,3 +3,6 @@
 
 # No need to store the pnpm store twice.
 .local
+
+# Local Docker pnpm store; never present on Replit.
+.pnpm-store

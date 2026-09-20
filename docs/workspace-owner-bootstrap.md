@@ -43,6 +43,13 @@ one-time provisioning step, not application startup behavior.
 5. Sign in again and open the Workspace. The new owner can then approve users,
    assign tutor profiles, and manage Workspace content through the UI.
 
+Step 2 is easy to skip: the account must be created through the sign-up flow
+before any of this applies, because the pending record is written on first
+sign-in and not before. When the development database runs in containers,
+steps 3 and 4 go through `psql` in the `db` service — see
+[Local Docker development](local-docker.md) for the exact commands, including
+a `+clerk_test` address that needs no real mailbox.
+
 ## Safety rules
 
 - Run this against the development database only unless a separate production
