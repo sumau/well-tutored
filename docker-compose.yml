@@ -17,6 +17,10 @@ x-node: &node
   # repo (gitignored) where it persists between runs and stays fast.
   environment:
     PNPM_STORE_DIR: /workspace/.pnpm-store
+  # `flyctl proxy` (or any other tunnel to a deployment database) listens on the
+  # host, so the migrate service needs a route to it. Inert for local work.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   # Optional: Clerk keys for the private /workspace area. The public site runs
   # without them, so the file is not required.
   env_file:
@@ -120,6 +124,39 @@ services:
     # drizzle-kit applies a schema but cannot create the database that holds
     # it, so create it first. Repeat runs find it present and carry on.
     command: bash -lc 'createdb -h db -U postgres well_tutored_test 2>/dev/null || true; pnpm run verify:ci'
+
+  # The deployment image, for checking it locally before pushing it anywhere.
+  # Unlike the services above it has no bind mount and no pnpm: it runs the
+  # built bundle exactly as a container host would. See docs/deploy.md.
+  #
+  #   docker compose up --build prod   # http://localhost:8081
+  #
+  # The public site needs seeded content to look like anything, and seeding only
+  # runs when NODE_ENV=development, so point this at the development database
+  # after `docker compose up api` has populated it.
+  prod:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        # A real pk_test_... key here if you want to exercise sign-in.
+        VITE_CLERK_PUBLISHABLE_KEY: ""
+    image: well-tutored:latest
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored
+      # The published origin. Off Replit nothing supplies this, and without it
+      # every credentialed request is rejected — including the enquiry POST.
+      TRUSTED_ORIGINS: http://localhost:8081
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

@@ -17,6 +17,19 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 - The committed `Project` workflow runs CI before `dev-smoke`, so development smoke checks do not overlap with mutable integration-test work.
 - Production-only API env: `CLERK_SECRET_KEY` enables the Clerk Frontend API proxy used by the production deployment. It is not required for development previews.
 
+## Deploying
+
+Replit publishes this repository: its router fronts both artifacts on one
+domain, and `pnpm run verify:deploy` is the build gate.
+
+The same app also deploys as a single container to any container host, where the
+API serves the frontend build itself because there is no router to do it.
+`docker/Dockerfile` and `fly.toml` cover that; see
+[docs/deploy.md](docs/deploy.md). The trap worth knowing either way: off Replit
+`TRUSTED_ORIGINS` must name the public origin explicitly, because the
+`REPLIT_DOMAINS` fallback is gone and an empty trusted-origin set rejects every
+credentialed request.
+
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
@@ -38,6 +51,9 @@ Well Tutored helps families discover women tutors, read tutor-written resources,
 ## Architecture decisions
 
 - The public site remains accessible without an account; Clerk gates only the private workspace.
+- `clerkMiddleware` is mounted under `/api` rather than globally: Clerk answers
+  `text/html` requests with a handshake redirect, which would intercept every
+  page load in a deployment where the API also serves the frontend build.
 - Browser API requests use Clerk's same-origin session cookies; bearer-token wiring is reserved for mobile clients.
 - Public tutor/resource content is served through the API and seeded for a useful first preview.
 - OpenAPI generates both React Query hooks and Zod schemas to keep client/server contracts aligned.

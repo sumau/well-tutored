@@ -5,6 +5,7 @@ import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { mountWebClient } from "./lib/web-client";
 import {
   getTrustedOrigins,
   isTrustedOrigin,
@@ -66,7 +67,15 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Scoped to /api, not global. Clerk treats a request that accepts text/html as
+// a document request and answers it with a handshake redirect (307) when it
+// cannot establish a session — which is every page load once this server serves
+// the frontend itself, so a browser would bounce to Clerk instead of ever
+// receiving the app. Under Replit's router the frontend was served elsewhere and
+// this middleware only ever saw API requests; mounting it at /api keeps it that
+// way. The SPA authenticates client-side through @clerk/react.
 app.use(
+  "/api",
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
@@ -80,6 +89,11 @@ app.use("/api", router);
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Not found." });
 });
+
+// After the /api 404, so an unknown API path stays JSON instead of being
+// answered with the SPA shell. A no-op in development.
+mountWebClient(app);
+
 app.use(apiErrorHandler);
 
 export default app;

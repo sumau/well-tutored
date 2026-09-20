@@ -1,0 +1,42 @@
+# Fly.io deployment for Well Tutored. One machine serving the frontend and the
+# API from a single origin, plus a managed PostgreSQL. See docs/deploy.md for
+# the full walkthrough, including the secrets this file deliberately omits.
+#
+# `fly launch` will rewrite `app` to whatever name it allocates. Update
+# TRUSTED_ORIGINS to match the hostname it gives you.
+
+app = "well-tutored"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "docker/Dockerfile"
+
+  [build.args]
+    # Read by the browser bundle, so it has to be present at build time rather
+    # than set as a secret. Publishable keys are public values. Leave it empty
+    # to deploy the public site without workspace sign-in.
+    VITE_CLERK_PUBLISHABLE_KEY = ""
+
+[env]
+  PORT = "8080"
+  # The exact public origin. Nothing infers this off Replit, and an empty
+  # trusted-origin set rejects every credentialed request, enquiries included.
+  TRUSTED_ORIGINS = "https://well-tutored.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/healthz"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

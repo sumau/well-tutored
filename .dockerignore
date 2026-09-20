@@ -1,0 +1,15 @@
+# The production build (docker/Dockerfile) copies the whole repository, so keep
+# the local development tree out of the build context. The dev image
+# (docker/Dockerfile.dev) bind-mounts the repository instead and is unaffected.
+
+node_modules
+**/node_modules
+.pnpm-store
+dist
+**/dist
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+.git
+.env
+screenshots
