@@ -26,8 +26,8 @@ not this deployment's own, and the Clerk proxy signs its upstream requests with
 the hostname the browser used. Splitting the two is possible but is not a
 configuration this codebase currently supports.
 
-Plus a PostgreSQL database, which every provider below offers as a managed
-add-on.
+Plus a PostgreSQL database, which is a separate decision from the container
+host — see **Choosing a database** below.
 
 ## Configuration
 
@@ -58,15 +58,23 @@ middleware is mounted under `/api` only.
 
 `fly.toml` is committed and points at `docker/Dockerfile`.
 
+Fly runs the container. The database comes from somewhere else — see **Choosing
+a database** below, and have its `DATABASE_URL` in hand before deploying.
+
 ```
-fly launch --no-deploy        # rewrites `app`; keep the existing fly.toml
-fly postgres create --name well-tutored-db
-fly postgres attach well-tutored-db     # sets DATABASE_URL
-fly secrets set CLERK_SECRET_KEY=sk_live_... CLERK_PUBLISHABLE_KEY=pk_live_...
+fly apps create well-tutored
+fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
+  CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
-Then set `TRUSTED_ORIGINS` in `fly.toml` to the hostname `fly launch` allocated,
-put the publishable key in `[build.args]`, apply the schema (below), and:
+`fly launch --no-deploy` also works, but it rewrites the committed `fly.toml`
+from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
+`fly apps create` only reserves the name, which is all this repository needs.
+
+Then set `TRUSTED_ORIGINS` in `fly.toml` to the hostname you were allocated — it
+must match exactly, or every credentialed request is rejected, the public
+enquiry POST included — put the publishable key in `[build.args]`, apply the
+schema (below), and:
 
 ```
 fly deploy
@@ -86,6 +94,41 @@ docker build -f docker/Dockerfile --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_live
 
 Point the platform's health check at `/api/healthz` and let it supply `PORT` if
 it insists on its own.
+
+## Choosing a database
+
+Anything that speaks Postgres works. `lib/db/src/index.ts` builds a bare `pg`
+pool from `DATABASE_URL` with no SSL options of its own, so a hosted database
+needs `?sslmode=require` appended to the connection string.
+
+**Neon or Supabase** are the shortest path. Both have a free tier, both take
+real backups, and — the part that matters operationally — both are reachable
+over the public internet. Every step that runs from a local checkout (the schema
+push below, seeding, copying data in) then needs no tunnel at all. Create a
+database, copy the connection string, append `?sslmode=require`, and set it as a
+Fly secret.
+
+**Fly Managed Postgres** keeps the database on the same bill and the same
+private network as the app:
+
+```
+fly mpg create --name well-tutored-db --region lhr
+fly mpg attach <cluster-id> -a well-tutored   # sets DATABASE_URL to the pooled URL
+```
+
+`attach` points `DATABASE_URL` at the PGBouncer-pooled connection, which is the
+one you want for a web app. Two things to plan for, though. Plans started at
+$38/month when this was written, so check the current price before assuming Fly
+is the cheap option. And the cluster is not reachable over the public internet:
+anything run from a checkout needs `fly mpg proxy` open first, with
+`DATABASE_URL` pointed at the local port it prints.
+
+**`fly postgres create`** is the older unmanaged flavour — a Postgres app in
+your own organisation. Fly's documentation now states they cannot support or
+advise on it, and it is daily volume snapshots only, so a hardware failure loses
+everything written since the last one. `enquiries` is the table that makes that
+unacceptable: tutors and resources can be recreated through `/workspace`, but an
+enquiry that arrives and is lost is gone.
 
 ## Applying the schema
 
@@ -165,9 +208,11 @@ thing back. The dump orders table data by foreign-key dependency rather than by
 name, so `tutors` lands before `resources` and `enquiries` without any help, and
 it carries the `setval` calls that leave each sequence past the copied ids.
 
-A target reachable only through `flyctl proxy` on the host needs
-`--add-host=host.docker.internal:host-gateway` on that `docker run`, and the same
-route is already configured for the `migrate` service in `docker-compose.yml`.
+A target reachable only through a tunnel on the host — `fly mpg proxy`, or any
+other — needs `--add-host=host.docker.internal:host-gateway` on that `docker
+run`, with the host's port in `$TARGET_URL` as `host.docker.internal`. The same
+route is already configured for the `migrate` service in `docker-compose.yml`. A
+publicly reachable database needs none of this.
 
 **Whether to copy `workspace_accounts` depends on Clerk.** The table's
 `clerk_user_id` is `NOT NULL UNIQUE`, so those rows only mean anything to the
