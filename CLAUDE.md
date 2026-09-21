@@ -10,6 +10,18 @@ Keep it that way. When something changes that belongs in a project brief,
 update `replit.md`, not this file. This file covers only what differs when
 working through Claude Code rather than in the Replit workspace.
 
+## Replit is being removed
+
+[REPLIT-REMOVAL-PLAN.md](REPLIT-REMOVAL-PLAN.md) is the plan: three ordered
+changes, with the ordering constraint and the file-level change sets. Read it
+before touching anything Replit-related, including the deployment docs — much
+of what `replit.md` and `docs/deploy.md` describe is the thing being deleted,
+so they read as current when they are not.
+
+[CONTEXT.md](CONTEXT.md) is the glossary and [docs/adr/](docs/adr/) holds the
+decisions behind the move. Delete this section and the plan when its last
+change lands.
+
 ## Running things here
 
 Everything runs in containers — there is no host Node, pnpm, or PostgreSQL.
