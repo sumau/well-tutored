@@ -11,7 +11,7 @@
     "test:database-config": "tsx --test ./src/test-database.test.ts",
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:dev": "tsx ./src/smoke-check.ts --dev",
-    "smoke:allow-empty": "tsx ./src/smoke-check.ts --allow-empty",
+    "smoke:incomplete": "tsx ./src/smoke-check.ts --allow-empty --dev-clerk-instance",
     "smoke:published": "tsx ./src/smoke-check.ts --published",
     "smoke:published:lifecycle": "tsx ./src/publish-smoke.ts",
     "smoke:enquiry": "tsx ./src/enquiry-browser-smoke.ts",

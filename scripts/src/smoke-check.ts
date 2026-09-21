@@ -18,15 +18,17 @@ const DEFAULT_TOTAL_TIMEOUT_MS = 60_000;
 const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
 const PUBLISHED_CHECK_FLAG = "--published";
 const DEVELOPMENT_CHECK_FLAG = "--dev";
-// Named for the condition under which passing it is correct, not for what it
-// waives: a stale --allow-empty in CI should read as a bug.
+// Both waivers are named for the condition under which passing them is
+// correct, not for what they skip: a stale one in CI should read as a bug.
 const EMPTY_CONTENT_CHECK_FLAG = "--allow-empty";
+const DEVELOPMENT_CLERK_INSTANCE_FLAG = "--dev-clerk-instance";
 
 type JsonRecord = Record<string, unknown>;
 
 type SmokeCheckModes = {
   isDevelopmentCheck: boolean;
   allowsEmptyContent: boolean;
+  hasDevelopmentClerkInstance: boolean;
 };
 
 type ResponseData = {
@@ -458,6 +460,13 @@ async function runSmokeCheckSteps(
     skipped.push(
       "/api/__clerk/v1/environment (Clerk proxy is production-only)",
     );
+  } else if (modes.hasDevelopmentClerkInstance) {
+    // The proxy attributes a request to an instance by the host in
+    // Clerk-Proxy-Url. A development instance has no such host registered, so
+    // Clerk answers host_invalid however healthy the Deployment is.
+    skipped.push(
+      "/api/__clerk/v1/environment (Deployment is on a development Clerk instance)",
+    );
   } else {
     const clerkEnvironment = requireRecord(
       await checkJson(
@@ -649,6 +658,9 @@ export async function runSmokeCheck() {
     await runSmokeCheckSteps(baseUrl, timeoutMs, deadline, {
       isDevelopmentCheck: process.argv.includes(DEVELOPMENT_CHECK_FLAG),
       allowsEmptyContent: process.argv.includes(EMPTY_CONTENT_CHECK_FLAG),
+      hasDevelopmentClerkInstance: process.argv.includes(
+        DEVELOPMENT_CLERK_INSTANCE_FLAG,
+      ),
     });
   } finally {
     deadline.close();
