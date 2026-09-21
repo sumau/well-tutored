@@ -18,8 +18,16 @@ const DEFAULT_TOTAL_TIMEOUT_MS = 60_000;
 const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
 const PUBLISHED_CHECK_FLAG = "--published";
 const DEVELOPMENT_CHECK_FLAG = "--dev";
+// Named for the condition under which passing it is correct, not for what it
+// waives: a stale --allow-empty in CI should read as a bug.
+const EMPTY_CONTENT_CHECK_FLAG = "--allow-empty";
 
 type JsonRecord = Record<string, unknown>;
+
+type SmokeCheckModes = {
+  isDevelopmentCheck: boolean;
+  allowsEmptyContent: boolean;
+};
 
 type ResponseData = {
   response: Response;
@@ -432,7 +440,7 @@ async function runSmokeCheckSteps(
   baseUrl: URL,
   timeoutMs: number,
   deadline: SmokeDeadline,
-  isDevelopmentCheck: boolean,
+  modes: SmokeCheckModes,
 ) {
   const passed: string[] = [];
   const skipped: string[] = [];
@@ -446,7 +454,7 @@ async function runSmokeCheckSteps(
   }
   passed.push("/api/healthz");
 
-  if (isDevelopmentCheck) {
+  if (modes.isDevelopmentCheck) {
     skipped.push(
       "/api/__clerk/v1/environment (Clerk proxy is production-only)",
     );
@@ -488,9 +496,12 @@ async function runSmokeCheckSteps(
     "/api/tutors",
   );
   if (tutors.length === 0) {
-    throw new SmokeCheckError(
-      "/api/tutors: expected at least one published tutor.",
-    );
+    if (!modes.allowsEmptyContent) {
+      throw new SmokeCheckError(
+        "/api/tutors: expected at least one published tutor.",
+      );
+    }
+    skipped.push("/api/tutors has a published Tutor (deployment is empty)");
   }
   const parsedTutors = tutors.map((tutor, index) =>
     expectTutor(tutor, `/api/tutors[${index}]`),
@@ -543,8 +554,13 @@ async function runSmokeCheckSteps(
     }
   }
   if (resources.length === 0) {
-    throw new SmokeCheckError(
-      "/api/resources: expected at least one published resource.",
+    if (!modes.allowsEmptyContent) {
+      throw new SmokeCheckError(
+        "/api/resources: expected at least one published resource.",
+      );
+    }
+    skipped.push(
+      "/api/resources has a published Resource (deployment is empty)",
     );
   }
   const parsedResources = resources.map((resource, index) =>
@@ -557,15 +573,23 @@ async function runSmokeCheckSteps(
     passed.push(path);
   }
 
-  const tutorSlug = parsedTutors[0].slug as string;
-  const tutorPath = `/tutors/${encodeURIComponent(tutorSlug)}`;
-  await checkPublicPage(baseUrl, tutorPath, timeoutMs, deadline);
-  passed.push(tutorPath);
+  if (parsedTutors.length === 0) {
+    skipped.push("/tutors/:slug (no published Tutor to address)");
+  } else {
+    const tutorSlug = parsedTutors[0].slug as string;
+    const tutorPath = `/tutors/${encodeURIComponent(tutorSlug)}`;
+    await checkPublicPage(baseUrl, tutorPath, timeoutMs, deadline);
+    passed.push(tutorPath);
+  }
 
-  const resourceSlug = parsedResources[0].slug as string;
-  const resourcePath = `/resources/${encodeURIComponent(resourceSlug)}`;
-  await checkPublicPage(baseUrl, resourcePath, timeoutMs, deadline);
-  passed.push(resourcePath);
+  if (parsedResources.length === 0) {
+    skipped.push("/resources/:slug (no published Resource to address)");
+  } else {
+    const resourceSlug = parsedResources[0].slug as string;
+    const resourcePath = `/resources/${encodeURIComponent(resourceSlug)}`;
+    await checkPublicPage(baseUrl, resourcePath, timeoutMs, deadline);
+    passed.push(resourcePath);
+  }
 
   const invalidEnquiry = await request(
     baseUrl,
@@ -619,16 +643,13 @@ export async function runSmokeCheck() {
   const baseUrl = resolveBaseUrl();
   const timeoutMs = resolveTimeoutMs();
   const totalTimeoutMs = resolveTotalTimeoutMs();
-  const isDevelopmentCheck = process.argv.includes(DEVELOPMENT_CHECK_FLAG);
   const deadline = createSmokeDeadline(totalTimeoutMs);
 
   try {
-    await runSmokeCheckSteps(
-      baseUrl,
-      timeoutMs,
-      deadline,
-      isDevelopmentCheck,
-    );
+    await runSmokeCheckSteps(baseUrl, timeoutMs, deadline, {
+      isDevelopmentCheck: process.argv.includes(DEVELOPMENT_CHECK_FLAG),
+      allowsEmptyContent: process.argv.includes(EMPTY_CONTENT_CHECK_FLAG),
+    });
   } finally {
     deadline.close();
   }

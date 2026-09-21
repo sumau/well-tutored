@@ -174,6 +174,15 @@ async function startRedirectFixture(): Promise<{
   };
 }
 
+const emptyContent: FailureCase["respond"] = (request, response) => {
+  const path = request.url ?? "/";
+  if (path !== "/api/tutors" && path !== "/api/resources") {
+    return false;
+  }
+  writeJson(response, []);
+  return true;
+};
+
 function pathResponse(
   path: string,
   callback: (
@@ -291,6 +300,7 @@ function runSmokeCommand(
   options: {
     development?: boolean;
     published?: boolean;
+    allowEmpty?: boolean;
     publishedUrl?: string;
     publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
     timeoutMs?: string;
@@ -309,6 +319,7 @@ function runSmokeCommand(
       smokeFile,
       ...(options.published ? ["--published"] : []),
       ...(options.development ? ["--dev"] : []),
+      ...(options.allowEmpty ? ["--allow-empty"] : []),
     ],
     {
       cwd: scriptsRoot,
@@ -583,6 +594,95 @@ test("development check skips the production-only Clerk proxy assertion", async 
   }
 });
 
+test("an empty deployment fails the launch check without the waiver", async () => {
+  const fixture = await startFixture({
+    name: "empty deployment",
+    expectedMessage: "",
+    respond: emptyContent,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url);
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /\/api\/tutors: expected at least one published tutor\./,
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("--allow-empty waives the content assertions an empty deployment cannot meet", async () => {
+  const fixture = await startFixture({
+    name: "empty deployment with the waiver",
+    expectedMessage: "",
+    respond: emptyContent,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, { allowEmpty: true });
+    const skippedChecks = [...result.output.matchAll(/^\s+- (.+)$/gm)].map(
+      ([, check]) => check,
+    );
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.deepEqual(
+      skippedChecks,
+      [
+        "/api/tutors has a published Tutor (deployment is empty)",
+        "/api/resources has a published Resource (deployment is empty)",
+        "/tutors/:slug (no published Tutor to address)",
+        "/resources/:slug (no published Resource to address)",
+      ],
+      result.output,
+    );
+    // Everything that does not depend on content still runs, the public pages
+    // included — requesting those as HTML is what catches a broken deployment.
+    assert.deepEqual(fixture.requests, [
+      "GET /api/healthz",
+      "GET /api/__clerk/v1/environment",
+      "GET /api/tutors",
+      "GET /api/resources",
+      "GET /",
+      "GET /resources",
+      "GET /enquire",
+      "POST /api/enquiries",
+      "GET /api/healthz",
+    ]);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("--allow-empty waives nothing once the deployment has content", async () => {
+  const fixture = await startFixture({
+    name: "populated deployment with the waiver",
+    expectedMessage: "",
+    respond: () => false,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, { allowEmpty: true });
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.doesNotMatch(result.output, /^\s+- /m);
+    assert.equal(
+      fixture.requests.includes("GET /tutors/ada%20lovelace"),
+      true,
+      result.output,
+    );
+    assert.equal(
+      fixture.requests.includes("GET /resources/learning%20%26%20mathematics"),
+      true,
+      result.output,
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("published check rejects a deployment domain that drifted from the artifact target", async () => {
   const result = await runSmokeCommand(undefined, {
     published: true,
@@ -649,10 +749,7 @@ test(
   `SMOKE_TIMEOUT_MS accepts the supported boundaries ` +
     `(${SMOKE_TIMEOUT_MIN_MS}-${SMOKE_TIMEOUT_MAX_MS}ms)`,
   async () => {
-    for (const timeoutMs of [
-      SMOKE_TIMEOUT_MIN_MS,
-      SMOKE_TIMEOUT_MAX_MS,
-    ]) {
+    for (const timeoutMs of [SMOKE_TIMEOUT_MIN_MS, SMOKE_TIMEOUT_MAX_MS]) {
       const fixture = await startFixture({
         name: `timeout boundary fixture (${timeoutMs})`,
         expectedMessage: "",
@@ -678,10 +775,7 @@ test("overall smoke deadline stops sequential slow requests", async () => {
       "/api/__clerk/v1/environment: overall smoke check timed out after 1000ms.",
     respond: (request, response) => {
       const path = request.url ?? "/";
-      if (
-        path !== "/api/healthz" &&
-        path !== "/api/__clerk/v1/environment"
-      ) {
+      if (path !== "/api/healthz" && path !== "/api/__clerk/v1/environment") {
         return false;
       }
 
