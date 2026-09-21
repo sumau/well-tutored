@@ -138,10 +138,12 @@ jobs:
       # A Deploy succeeding does not mean the Deployment is usable. The launch
       # smoke is fetch-based, so no browser is needed here.
       #
-      # The waiver is correct only while the Deployment has no published
-      # content. When it has some, this becomes `pnpm run smoke:launch` and
-      # both --allow-empty script entries go with it.
+      # "incomplete" is the two conditions this Deployment is still in, each
+      # waived by its own flag in the script and each with its own end: it has
+      # no published content, and its Clerk instance is a development one. When
+      # the last flag goes, this becomes `pnpm run smoke:launch` and the two
+      # script entries go with it.
       - name: Launch smoke
         env:
           SMOKE_BASE_URL: https://well-tutored.fly.dev
-        run: pnpm run smoke:launch:allow-empty
+        run: pnpm run smoke:launch:incomplete

@@ -183,6 +183,26 @@ const emptyContent: FailureCase["respond"] = (request, response) => {
   return true;
 };
 
+const hostInvalidClerkProxy = pathResponse(
+  "/api/__clerk/v1/environment",
+  (_request, response) => {
+    writeJson(
+      response,
+      {
+        errors: [
+          {
+            message: "Invalid host",
+            long_message:
+              "We were unable to attribute this request to an instance running on Clerk.",
+            code: "host_invalid",
+          },
+        ],
+      },
+      400,
+    );
+  },
+);
+
 function pathResponse(
   path: string,
   callback: (
@@ -301,6 +321,7 @@ function runSmokeCommand(
     development?: boolean;
     published?: boolean;
     allowEmpty?: boolean;
+    devClerkInstance?: boolean;
     publishedUrl?: string;
     publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
     timeoutMs?: string;
@@ -320,6 +341,7 @@ function runSmokeCommand(
       ...(options.published ? ["--published"] : []),
       ...(options.development ? ["--dev"] : []),
       ...(options.allowEmpty ? ["--allow-empty"] : []),
+      ...(options.devClerkInstance ? ["--dev-clerk-instance"] : []),
     ],
     {
       cwd: scriptsRoot,
@@ -594,6 +616,53 @@ test("development check skips the production-only Clerk proxy assertion", async 
   }
 });
 
+test("a development Clerk instance fails the launch check without the waiver", async () => {
+  const fixture = await startFixture({
+    name: "development Clerk instance",
+    expectedMessage: "",
+    respond: hostInvalidClerkProxy,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url);
+
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /\/api\/__clerk\/v1\/environment: expected HTTP 200, received 400\./,
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("--dev-clerk-instance waives the Clerk proxy assertion", async () => {
+  const fixture = await startFixture({
+    name: "development Clerk instance with the waiver",
+    expectedMessage: "",
+    respond: hostInvalidClerkProxy,
+  });
+
+  try {
+    const result = await runSmokeCommand(fixture.url, {
+      devClerkInstance: true,
+    });
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /- \/api\/__clerk\/v1\/environment \(Deployment is on a development Clerk instance\)/,
+    );
+    assert.equal(
+      fixture.requests.includes("GET /api/__clerk/v1/environment"),
+      false,
+      result.output,
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("an empty deployment fails the launch check without the waiver", async () => {
   const fixture = await startFixture({
     name: "empty deployment",
@@ -628,6 +697,13 @@ test("--allow-empty waives the content assertions an empty deployment cannot mee
     );
 
     assert.equal(result.exitCode, 0, result.output);
+    // The Clerk proxy is still asserted: --allow-empty waives content, and
+    // nothing else.
+    assert.equal(
+      fixture.requests.includes("GET /api/__clerk/v1/environment"),
+      true,
+      result.output,
+    );
     assert.deepEqual(
       skippedChecks,
       [
