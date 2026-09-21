@@ -145,6 +145,13 @@ the two conditions this Deployment is still in: it has no published content,
 and its Clerk instance is a development one. Each has its own end. When the
 last one goes, this becomes `pnpm run smoke:launch`.
 
+**This step is expected to pass, including while the Deployment is empty** —
+the waivers are exactly what make that true. So a red Launch smoke on a merge
+to `main` is a real failure: an unhealthy site, a redirect to another origin, a
+broken public page. It is not the known-empty state, and it is not something to
+wave through. Only the flagless `pnpm run smoke:launch`, run by hand, fails on
+absent content.
+
 ## Recommended release sequence
 
 1. Run `pnpm run verify:ci`. It prepares and uses only the dedicated
