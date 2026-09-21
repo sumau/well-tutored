@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright-core";
 import { resolveBaseUrl, resolveTimeoutMs } from "./smoke-check.js";
 
-const DEFAULT_CHROMIUM_PATH = "/repl/tools/bin/chromium";
+const CHROMIUM_PATH_ENV_KEY = "SMOKE_CHROMIUM_PATH";
 
 class BrowserSmokeCheckError extends Error {}
 
@@ -256,8 +256,18 @@ async function runTutorProfileSmokeCheck(
 async function runBrowserSmokeCheck() {
   const baseUrl = resolveBaseUrl();
   const timeoutMs = resolveTimeoutMs();
+  const executablePath = process.env[CHROMIUM_PATH_ENV_KEY]?.trim();
+  if (!executablePath) {
+    // playwright-core ships no browser, and none of this project's images
+    // carry one, so there is no sensible default to fall back to. This check
+    // runs from wherever a Chromium already exists.
+    throw new BrowserSmokeCheckError(
+      `${CHROMIUM_PATH_ENV_KEY} must name a Chromium executable: ` +
+        "playwright-core bundles no browser.",
+    );
+  }
   const browser = await chromium.launch({
-    executablePath: process.env.SMOKE_CHROMIUM_PATH || DEFAULT_CHROMIUM_PATH,
+    executablePath,
     headless: true,
     args: ["--no-sandbox"],
   });

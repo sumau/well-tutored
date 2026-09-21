@@ -1,5 +1,5 @@
 # Production image: one container serving the built frontend and the API on a
-# single origin, which is what Replit's router used to provide. See
+# single origin. See
 # docs/deploy.md.
 #
 # Build from the repository root, not from docker/:

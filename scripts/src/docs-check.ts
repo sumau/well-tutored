@@ -63,13 +63,13 @@ function walkFiles(directory: string, fileName?: string): string[] {
 }
 
 function documentationFiles(rootDir: string): string[] {
-  const files = [
-    ...(existsSync(join(rootDir, "replit.md")) ? [join(rootDir, "replit.md")] : []),
+  return [
+    ...(existsSync(join(rootDir, "PROJECT.md"))
+      ? [join(rootDir, "PROJECT.md")]
+      : []),
     ...walkFiles(join(rootDir, "docs")),
-  ];
-
-  return files
-    .filter((filePath) => filePath === join(rootDir, "replit.md") || filePath.endsWith(".md"))
+  ]
+    .filter((filePath) => filePath.endsWith(".md"))
     .sort();
 }
 
@@ -295,114 +295,118 @@ export function validateDocumentedCommands(
   return errors;
 }
 
-export type WorkflowReference = {
-  kind: "command" | "workflow";
+export type WorkflowCommand = {
   filePath: string;
   lineNumber: number;
-  value: string;
+  command: string;
 };
 
-export type WorkflowReferences = {
-  workflowNames: string[];
-  references: WorkflowReference[];
-};
+// pnpm's own subcommands, which a workflow calls directly and which name no
+// script. Documentation writes `pnpm run <script>`; a workflow also has to
+// install. Only the ones a workflow plausibly runs are listed.
+const PNPM_BUILTIN_COMMANDS = new Set([
+  "add",
+  "audit",
+  "config",
+  "dlx",
+  "exec",
+  "fetch",
+  "install",
+  "link",
+  "prune",
+  "rebuild",
+  "remove",
+  "store",
+  "update",
+  "why",
+]);
 
-function parseTomlStringArray(value: string): string[] {
-  return [...value.matchAll(/"([^"]*)"/g)].map((match) => match[1]);
+function namesAScript(command: string): boolean {
+  const firstArgument = command.split(/\s+/)[1];
+  return firstArgument === undefined || !PNPM_BUILTIN_COMMANDS.has(firstArgument);
 }
 
-export function extractWorkflowReferences(
+/**
+ * Pull every `pnpm` invocation out of a workflow's `run:` steps.
+ *
+ * Deliberately a line scan rather than a YAML parse: the only thing this needs
+ * from the document is which shell commands it runs, and `run:` is the one key
+ * that carries them. A block scalar (`run: |`) continues until the indentation
+ * drops back to the key's own level.
+ */
+export function extractWorkflowCommands(
   content: string,
-  filePath = ".replit",
-): WorkflowReferences {
+  filePath: string,
+): WorkflowCommand[] {
   const lines = content.split(/\r?\n/);
-  const workflowNames: string[] = [];
-  const references: WorkflowReference[] = [];
+  const commands: WorkflowCommand[] = [];
+
+  const push = (lineNumber: number, shellCommand: string) => {
+    commands.push(
+      ...extractPnpmCommands(shellCommand)
+        .filter(namesAScript)
+        .map((command) => ({
+          filePath,
+          lineNumber,
+          command,
+        })),
+    );
+  };
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const nameMatch = line.match(/^\s*name\s*=\s*"([^"]+)"/);
-    if (nameMatch) {
-      workflowNames.push(nameMatch[1]);
-    }
+    const runMatch = lines[index].match(/^(\s*)-?\s*run:\s*(.*)$/);
+    if (!runMatch) continue;
 
-    const taskMatch = line.match(/^\s*task\s*=\s*"([^"]+)"/);
-    const argsLine = lines[index + 1];
-    const argsMatch = argsLine?.match(/^\s*args\s*=\s*"([^"]+)"/);
-    if (taskMatch && argsMatch) {
-      if (taskMatch[1] === "workflow.run") {
-        references.push({
-          kind: "workflow",
-          filePath,
-          lineNumber: index + 2,
-          value: argsMatch[1],
-        });
-      } else if (taskMatch[1] === "shell.exec") {
-        references.push(
-          ...extractPnpmCommands(argsMatch[1]).map((command) => ({
-            kind: "command" as const,
-            filePath,
-            lineNumber: index + 2,
-            value: command,
-          })),
-        );
-      }
-    }
-
-    const buildMatch = line.match(/^\s*build\s*=\s*(\[.*\])\s*$/);
-    if (buildMatch) {
-      const command = parseTomlStringArray(buildMatch[1]).join(" ");
-      if (command.startsWith("pnpm ")) {
-        references.push({
-          kind: "command",
-          filePath,
-          lineNumber: index + 1,
-          value: command,
-        });
-      }
-    }
-  }
-
-  return { workflowNames, references };
-}
-
-export function validateWorkflowReferences(
-  content: string,
-  manifests: PackageManifestRecord[],
-  filePath = ".replit",
-): string[] {
-  const { workflowNames, references } = extractWorkflowReferences(
-    content,
-    filePath,
-  );
-  const errors: string[] = [];
-  const knownWorkflows = new Set(workflowNames);
-
-  for (const reference of references) {
-    if (reference.kind === "workflow") {
-      if (!knownWorkflows.has(reference.value)) {
-        errors.push(
-          `${reference.filePath}:${reference.lineNumber}: workflow "${reference.value}" is referenced by workflow.run, but no workflow with that name is defined.`,
-        );
-      }
+    const [, leadingSpace, inlineValue] = runMatch;
+    const value = inlineValue.trim();
+    if (value !== "|" && value !== ">" && value !== "|-" && value !== ">-") {
+      push(index + 1, value.replace(/^['"]|['"]$/g, ""));
       continue;
     }
 
-    errors.push(
-      ...validateDocumentedCommands(
-        [
-          {
-            filePath: reference.filePath,
-            lineNumber: reference.lineNumber,
-            command: reference.value,
-          },
-        ],
-        manifests,
-      ),
-    );
+    const keyIndent = leadingSpace.length;
+    for (let block = index + 1; block < lines.length; block += 1) {
+      const line = lines[block];
+      if (line.trim() === "") continue;
+      const indent = line.length - line.trimStart().length;
+      if (indent <= keyIndent) break;
+      push(block + 1, line.trim());
+      index = block;
+    }
   }
 
-  return errors;
+  return commands;
+}
+
+export function validateWorkflowCommands(
+  content: string,
+  manifests: PackageManifestRecord[],
+  filePath: string,
+): string[] {
+  return validateDocumentedCommands(
+    extractWorkflowCommands(content, filePath).map(
+      ({ filePath: file, lineNumber, command }) => ({
+        filePath: file,
+        lineNumber,
+        command,
+      }),
+    ),
+    manifests,
+  );
+}
+
+function workflowFiles(rootDir: string): string[] {
+  const workflowsDir = join(rootDir, ".github", "workflows");
+  if (!existsSync(workflowsDir)) return [];
+
+  return readdirSync(workflowsDir, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        (entry.name.endsWith(".yml") || entry.name.endsWith(".yaml")),
+    )
+    .map((entry) => join(workflowsDir, entry.name))
+    .sort();
 }
 
 export function checkDocumentation(rootDir: string): DocumentationCheckResult {
@@ -419,10 +423,15 @@ export function checkDocumentation(rootDir: string): DocumentationCheckResult {
     return extractLocalLinks(readFileSync(filePath, "utf8"), relativePath);
   });
   const manifests = readPackageManifests(rootDir);
-  const replitPath = join(rootDir, ".replit");
-  const workflowErrors = existsSync(replitPath)
-    ? validateWorkflowReferences(readFileSync(replitPath, "utf8"), manifests)
-    : [];
+  // The workflows call pnpm scripts too, and a deploy that names a script that
+  // no longer exists fails after it has already shipped the image.
+  const workflowErrors = workflowFiles(rootDir).flatMap((filePath) =>
+    validateWorkflowCommands(
+      readFileSync(filePath, "utf8"),
+      manifests,
+      relative(rootDir, filePath),
+    ),
+  );
 
   return {
     commands,

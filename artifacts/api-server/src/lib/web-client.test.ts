@@ -12,13 +12,10 @@ test("serves nothing when nothing configured a root", () => {
 });
 
 test("leaves the frontend to whatever else fronts it in production", () => {
-  // Replit's router serves the build and the deployment runs with
-  // NODE_ENV=production, so an unset root must not be a startup failure.
+  // An unset root is a warning, not a startup failure: the Deployment sets it
+  // from docker/Dockerfile, and a process that only serves /api is a legitimate
+  // shape even though nothing here runs that way.
   assert.equal(resolveWebClientRoot({ NODE_ENV: "production" }), undefined);
-  assert.equal(
-    resolveWebClientRoot({ NODE_ENV: "production", REPLIT_DOMAINS: "app.example" }),
-    undefined,
-  );
 });
 
 test("resolves the configured root to an absolute path", () => {

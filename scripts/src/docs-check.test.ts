@@ -6,10 +6,10 @@ import {
   checkDocumentation,
   extractDocumentedCommands,
   extractLocalLinks,
-  extractWorkflowReferences,
+  extractWorkflowCommands,
   validateDocumentedCommands,
   validateLocalLinks,
-  validateWorkflowReferences,
+  validateWorkflowCommands,
   type PackageManifestRecord,
 } from "./docs-check.js";
 
@@ -59,9 +59,9 @@ test("validates root and filtered workspace scripts", () => {
   assert.deepEqual(
     validateDocumentedCommands(
       [
-        { filePath: "replit.md", lineNumber: 1, command: "pnpm run build" },
+        { filePath: "PROJECT.md", lineNumber: 1, command: "pnpm run build" },
         {
-          filePath: "replit.md",
+          filePath: "PROJECT.md",
           lineNumber: 2,
           command: "pnpm --filter @workspace/api-server run dev",
         },
@@ -161,69 +161,55 @@ test("validates local link existence and repository boundaries", () => {
   ]);
 });
 
-test("extracts workflow names, workflow.run targets, and pnpm commands", () => {
-  const references = extractWorkflowReferences(
+test("extracts pnpm commands from inline and block run steps", () => {
+  const commands = extractWorkflowCommands(
     [
-      "[[workflows.workflow]]",
-      'name = "Project"',
-      "",
-      "[[workflows.workflow.tasks]]",
-      'task = "workflow.run"',
-      'args = "ci"',
-      "",
-      "[[workflows.workflow.tasks]]",
-      'task = "shell.exec"',
-      'args = "pnpm run verify:ci && pnpm docs:check"',
-      "",
-      "[deployment]",
-      'build = ["pnpm", "run", "verify:deploy"]',
+      "jobs:",
+      "  verify:",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "      - name: Install dependencies",
+      "        run: pnpm install --frozen-lockfile",
+      "      - name: Verify",
+      "        run: pnpm run verify:ci && pnpm docs:check",
+      "      - name: Smoke",
+      "        run: |",
+      "          echo checking",
+      "          pnpm run smoke:launch:incomplete",
+      "      - name: Deploy",
+      "        run: flyctl deploy --remote-only",
     ].join("\n"),
+    ".github/workflows/ci.yml",
   );
 
-  assert.deepEqual(references, {
-    workflowNames: ["Project"],
-    references: [
-      {
-        kind: "workflow",
-        filePath: ".replit",
-        lineNumber: 6,
-        value: "ci",
-      },
-      {
-        kind: "command",
-        filePath: ".replit",
-        lineNumber: 10,
-        value: "pnpm run verify:ci",
-      },
-      {
-        kind: "command",
-        filePath: ".replit",
-        lineNumber: 10,
-        value: "pnpm docs:check",
-      },
-      {
-        kind: "command",
-        filePath: ".replit",
-        lineNumber: 13,
-        value: "pnpm run verify:deploy",
-      },
-    ],
-  });
+  // `pnpm install` names no script, and neither does a non-pnpm step.
+  assert.deepEqual(commands, [
+    {
+      filePath: ".github/workflows/ci.yml",
+      lineNumber: 8,
+      command: "pnpm run verify:ci",
+    },
+    {
+      filePath: ".github/workflows/ci.yml",
+      lineNumber: 8,
+      command: "pnpm docs:check",
+    },
+    {
+      filePath: ".github/workflows/ci.yml",
+      lineNumber: 12,
+      command: "pnpm run smoke:launch:incomplete",
+    },
+  ]);
 });
 
-test("validates workflow references and workflow shell commands", () => {
-  const errors = validateWorkflowReferences(
+test("validates the pnpm scripts a workflow runs", () => {
+  const errors = validateWorkflowCommands(
     [
-      "[[workflows.workflow]]",
-      'name = "Project"',
-      "",
-      "[[workflows.workflow.tasks]]",
-      'task = "workflow.run"',
-      'args = "missing-workflow"',
-      "",
-      "[[workflows.workflow.tasks]]",
-      'task = "shell.exec"',
-      'args = "pnpm run missing"',
+      "jobs:",
+      "  deploy:",
+      "    steps:",
+      "      - name: Launch smoke",
+      "        run: pnpm run missing",
     ].join("\n"),
     [
       {
@@ -231,11 +217,11 @@ test("validates workflow references and workflow shell commands", () => {
         manifest: { scripts: {} },
       },
     ],
+    ".github/workflows/ci.yml",
   );
 
   assert.deepEqual(errors, [
-    '.replit:6: workflow "missing-workflow" is referenced by workflow.run, but no workflow with that name is defined.',
-    '.replit:10: "pnpm run missing" references script "missing" in "package.json", but that script was not found.',
+    '.github/workflows/ci.yml:5: "pnpm run missing" references script "missing" in "package.json", but that script was not found.',
   ]);
 });
 

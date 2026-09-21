@@ -4,62 +4,54 @@ The project uses several complementary test layers. Most automated tests use
 Node's built-in `node:test` runner and are executed with `tsx`; the web tests
 also use JSDOM where browser APIs are needed.
 
-For the complete pre-publish validation setup, including Replit validation
-commands, see [CI and pre-publish validation](ci-validation.md).
+For the complete validation setup, including the deploy job, see [CI and deploy
+validation](ci-validation.md).
 
 ## Smoke testing at a glance
 
 The project has smoke **helper tests** that run against local fixtures, plus
-live smoke checks that target either the proxied development app or the
-published app. The CI integration tests use a temporary database, but the
-smoke helper tests do not target that database.
+live smoke checks that target either the local development stack or the
+Deployment. The CI integration tests use a temporary database, but the smoke
+helper tests do not target that database.
 
 ```mermaid
 flowchart TB
   subgraph automated["Automated gates"]
-    ci["ci workflow<br/>verify:ci"] --> ciHelpers["test:smoke<br/>smoke-check.test.ts<br/>publish-smoke.test.ts"]
-    deploy["Deployment build<br/>verify:deploy"] --> deployHelpers["test:smoke<br/>same helper tests"]
+    ci["CI: verify job<br/>verify:ci"] --> ciHelpers["test:smoke<br/>smoke-check.test.ts"]
     ci --> ciDb["Temporary PostgreSQL database<br/>for API lifecycle integration tests"]
+    deploy["CI: deploy job<br/>push to main"] --> flyDeploy["flyctl deploy"]
+    flyDeploy --> deployLaunch["smoke:launch:incomplete<br/>--allow-empty --dev-clerk-instance"]
+    deployLaunch --> deployTarget["https://well-tutored.fly.dev<br/>SMOKE_BASE_URL"]
+    deployTarget --> deployCoverage["Health, catalogue, public pages,<br/>invalid-enquiry recovery<br/>content and Clerk proxy waived"]
   end
 
   subgraph development["Live development smoke"]
-    project["Project workflow<br/>ci → dev-smoke"] --> devLaunch["smoke:dev<br/>smoke-check.ts --dev"]
-    project --> devBrowser["smoke:enquiry<br/>Chromium browser check"]
-    devLaunch --> devTarget["https://$REPLIT_DEV_DOMAIN<br/>proxied development app + /api"]
+    manualDev["Manual, against the local stack"] --> devLaunch["smoke:dev<br/>smoke-check.ts --dev"]
+    manualDev --> devBrowser["smoke:enquiry<br/>needs SMOKE_CHROMIUM_PATH"]
+    devLaunch --> devTarget["http://localhost:5173<br/>Vite dev server, proxying /api"]
     devBrowser --> devTarget
     devLaunch --> devCoverage["Health, catalogue, public pages,<br/>invalid-enquiry recovery<br/>Clerk proxy check skipped"]
     devBrowser --> devBrowserCoverage["Keyboard flow, validation,<br/>retry, success receipt<br/>requests intercepted"]
   end
 
-  subgraph published["Published-app smoke"]
-    postpublish["After publish<br/>postpublish lifecycle"] --> publishedLaunch["smoke:launch:published:lifecycle<br/>uses REPLIT_PUBLISHED_URL"]
-    manual["Manual shell command"] --> manualLaunch["smoke:launch<br/>or smoke:launch:published"]
-    manual --> publishedBrowser["smoke:enquiry:published<br/>Chromium browser check"]
-    publishedLaunch --> publishedTarget["Published URL<br/>checked against SMOKE_PRODUCTION_URL"]
-    manualLaunch --> publishedTarget
-    publishedBrowser --> publishedTarget
-    publishedTarget --> publishedCoverage["Health, Clerk proxy, catalogue,<br/>public pages, invalid-enquiry recovery"]
-    publishedBrowser --> publishedBrowserCoverage["Keyboard flow, validation,<br/>retry, success receipt<br/>requests intercepted"]
-  end
-
   classDef gate fill:#e8eefc,stroke:#4666a8,color:#172554
   classDef target fill:#e9f7ef,stroke:#3b8a5a,color:#14532d
   classDef coverage fill:#fff7df,stroke:#b7791f,color:#713f12
-  class ci,deploy,project,postpublish,manual gate
-  class devTarget,publishedTarget target
-  class devCoverage,devBrowserCoverage,publishedCoverage,publishedBrowserCoverage,ciDb coverage
+  class ci,deploy,manualDev gate
+  class devTarget,deployTarget target
+  class devCoverage,devBrowserCoverage,deployCoverage,ciDb coverage
 ```
 
 In short:
 
-- `test:smoke` is a code-level test suite for URL selection, deployment
-  metadata, redirects, timeouts, and response handling. It runs inside both
-  `verify:ci` and `verify:deploy`; it does not contact the live app.
-- `smoke:dev` and `smoke:enquiry` run against the proxied development domain
-  from the sequential `Project` workflow after `ci`.
-- `smoke:launch:published:lifecycle` runs automatically after publishing.
-  `smoke:launch` and `smoke:enquiry:published` are manual published-target
-  variants.
+- `test:smoke` is a code-level test suite for target selection, waivers,
+  redirects, timeouts, and response handling. It runs inside `verify:ci`; it
+  does not contact a live site.
+- `smoke:dev` and `smoke:enquiry` run manually against the local stack.
+- `smoke:launch:incomplete` runs automatically in the deploy job. `smoke:launch`
+  is the same check without the waivers, and is what to run by hand once the
+  Deployment has content.
+- Every mode requires `SMOKE_BASE_URL`; nothing has a default target.
 - The browser enquiry checks intercept the submission response, so they do not
   create a real enquiry. The launch checks send an intentionally invalid
   enquiry payload and expect validation to reject it before insertion.
@@ -120,15 +112,6 @@ target and fails with a connection-specific message if that database is not
 reachable. Each process also uses a unique fixture namespace, so overlapping
 runs do not reuse or delete one another's records.
 
-The deployment gate uses the API server's non-mutating deployment check:
-
-```sh
-pnpm --filter @workspace/api-server run test:deploy
-```
-
-This is intentionally separate from the complete `test` command so publishing
-never runs database setup or mutation tests against the deployment database.
-
 ### Web application
 
 Run the Well Tutored web tests with:
@@ -161,10 +144,10 @@ The script package tests the smoke-check and documentation-check helpers:
 pnpm --filter @workspace/scripts run test:smoke
 ```
 
-The smoke-check tests validate URL selection, published deployment metadata,
-redirect protection, timeout handling, and healthy responses against a local
-fixture. The documentation tests ensure documented `pnpm` commands refer to
-real package scripts.
+The smoke-check tests validate target selection, the waiver flags in both
+directions, redirect protection, timeout handling, and healthy responses
+against a local fixture. The documentation tests ensure that `pnpm` commands —
+in the docs and in the workflows' `run:` steps — refer to real package scripts.
 
 ## Static verification
 
@@ -192,35 +175,30 @@ Clerk environment proxy, published tutor and resource catalogue data, public
 pages, invalid-enquiry validation, and recovery health check:
 
 ```sh
-pnpm smoke:launch
+SMOKE_BASE_URL=https://well-tutored.fly.dev pnpm smoke:launch
 ```
 
-For a published deployment, pass the current Publishing URL:
-
-```sh
-SMOKE_PUBLISHED_URL=https://example.replit.app pnpm smoke:launch:published
-```
-
-The published check rejects missing or mismatched deployment metadata and
-cross-origin redirects. It does not require workspace credentials.
+`SMOKE_BASE_URL` is required in every mode and has no default. It does not
+require workspace credentials, and it rejects a target that redirects to
+another origin.
 
 The Playwright-based enquiry smoke check runs the real form in Chromium. It
 checks native Tab and Enter interaction, validation recovery, disabled-submit
 behavior, announced network errors, retry behavior, successful receipts, and
 preselected tutor profiles. Requests are intercepted so the check does not
-create production enquiries:
+create real Enquiries:
 
 ```sh
-SMOKE_PUBLISHED_URL=https://example.replit.app pnpm smoke:enquiry:published
+SMOKE_BASE_URL=http://localhost:5173 \
+  SMOKE_CHROMIUM_PATH=/path/to/chromium pnpm smoke:enquiry
 ```
 
-For local or custom-domain checks, use `SMOKE_BASE_URL` instead of a published
-URL. Per-request and overall smoke timeouts can be adjusted with
-`SMOKE_TIMEOUT_MS` and `SMOKE_TOTAL_TIMEOUT_MS`.
+Per-request and overall smoke timeouts can be adjusted with `SMOKE_TIMEOUT_MS`
+and `SMOKE_TOTAL_TIMEOUT_MS`. The waiver flags, and the conditions that end
+them, are in [launch-smoke-check.md](launch-smoke-check.md).
 
-For development, pre-publish, and post-publish smoke validation, including the
-Replit workflow instructions and release sequence, see
-[CI and pre-publish validation](ci-validation.md).
+For the deploy job and the release sequence, see [CI and deploy
+validation](ci-validation.md).
 
 ## Recommended verification sequence
 
@@ -234,8 +212,7 @@ pnpm run build
 Run the launch or enquiry smoke checks when the change affects routing, public
 API responses, deployment configuration, or the enquiry journey.
 
-Before publishing, use `pnpm run verify:ci` for the complete CI check. It
-requires and prepares the dedicated test database before running the
-database-backed API lifecycle tests. The deployment build separately runs
-`pnpm run verify:deploy`, which excludes the database-backed API lifecycle tests
-and runs only checks safe for the live deployment database.
+Before merging, use `pnpm run verify:ci` for the complete check. It requires
+and prepares the dedicated test database before running the database-backed API
+lifecycle tests. That is the same gate CI runs, and on `main` it is what a
+deploy waits for.

@@ -21,7 +21,7 @@ primary_region = "lhr"
 
 [env]
   PORT = "8080"
-  # The exact public origin. Nothing infers this off Replit, and an empty
+  # The exact public origin. Nothing infers it, and an empty
   # trusted-origin set rejects every credentialed request, enquiries included.
   TRUSTED_ORIGINS = "https://well-tutored.fly.dev"
 

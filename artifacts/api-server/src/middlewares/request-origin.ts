@@ -17,8 +17,9 @@ function valuesFromEnvironment(environment: Environment, key: string) {
 
 /**
  * Normalise an origin without accepting paths, credentials, or opaque origins.
- * Domain-only values are treated as HTTPS because Replit's configured domains
- * are public HTTPS origins.
+ * A bare domain is read as HTTPS. Nothing this project configures is written
+ * that way any more — the leniency is kept because a hostname pasted without a
+ * scheme is a likely mistake and rejecting it silently trusts nothing.
  */
 export function normalizeOrigin(value: string | undefined): string | undefined {
   if (!value || value.trim() === "" || value.trim().toLowerCase() === "null") {
@@ -51,36 +52,21 @@ function configuredValues(environment: Environment) {
   ];
   if (explicit.length > 0) return explicit;
 
-  const shared = [
-    ...valuesFromEnvironment(environment, "APP_ORIGIN"),
-    ...valuesFromEnvironment(environment, "PUBLIC_APP_ORIGIN"),
-    ...valuesFromEnvironment(environment, "PUBLIC_APP_URL"),
-  ];
-
-  if (environment.NODE_ENV === "production") {
-    return [
-      ...shared,
-      ...valuesFromEnvironment(environment, "REPLIT_DOMAINS"),
-    ];
-  }
+  // Production names its origin explicitly or trusts nothing. Development gets
+  // the local defaults, because there is no committed origin to read there.
+  if (environment.NODE_ENV === "production") return [];
 
   const localPort = environment.PORT
     ? [`http://localhost:${environment.PORT}`, `http://127.0.0.1:${environment.PORT}`]
     : [];
-  const devDomain = valuesFromEnvironment(environment, "REPLIT_DEV_DOMAIN");
-  return [
-    ...shared,
-    ...devDomain,
-    ...LOCAL_DEVELOPMENT_ORIGINS,
-    ...localPort,
-  ];
+  return [...LOCAL_DEVELOPMENT_ORIGINS, ...localPort];
 }
 
 /**
  * Return the exact origins that may receive credentialed API responses.
- * Explicit TRUSTED_ORIGINS (or the backwards-compatible CORS_ORIGINS alias)
- * replaces the environment defaults, which makes production configuration
- * fail closed instead of silently widening access.
+ * TRUSTED_ORIGINS (or the CORS_ORIGINS alias) replaces the localhost
+ * development defaults rather than adding to them, so a Deployment trusts what
+ * fly.toml names and nothing else.
  */
 export function getTrustedOrigins(environment: Environment = process.env): Set<string> {
   return new Set(

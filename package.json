@@ -7,8 +7,6 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run docs:check && pnpm run typecheck && pnpm -r --if-present run build",
     "docs:check": "pnpm --filter @workspace/scripts run docs:check",
-    "postpublish": "pnpm run smoke:launch:published:lifecycle",
-    "verify:deploy": "pnpm --filter @workspace/api-server run test:deploy && pnpm --filter @workspace/well-tutored test && pnpm --filter @workspace/scripts run test:smoke && pnpm run docs:check && pnpm run typecheck",
     "test:database-config": "pnpm --filter @workspace/scripts run test:database-config",
     "check:test-database": "pnpm --filter @workspace/scripts run check:test-database",
     "prepare:test-database": "pnpm --filter @workspace/scripts run prepare:test-database",
@@ -17,17 +15,11 @@
     "smoke:launch": "pnpm --filter @workspace/scripts run smoke",
     "smoke:dev": "pnpm --filter @workspace/scripts run smoke:dev",
     "smoke:launch:incomplete": "pnpm --filter @workspace/scripts run smoke:incomplete",
-    "smoke:launch:published": "pnpm --filter @workspace/scripts run smoke:published",
-    "smoke:launch:published:lifecycle": "pnpm --filter @workspace/scripts run smoke:published:lifecycle",
     "smoke:enquiry": "pnpm --filter @workspace/scripts run smoke:enquiry",
-    "smoke:enquiry:published": "pnpm --filter @workspace/scripts run smoke:enquiry:published",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
-  "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
-  },
   "devDependencies": {
     "prettier": "^3.9.4",
     "typescript": "~5.9.3"

@@ -1,7 +1,7 @@
-# CI and pre-publish validation
+# CI and deploy validation
 
 The project uses separate checks for deterministic code quality, the running
-development environment, and the published deployment.
+development stack, and the live Deployment.
 
 ## Deterministic CI validation
 
@@ -19,19 +19,15 @@ This command runs, in order:
 4. The complete API server test suite, including database-backed workspace
    lifecycle integration tests.
 5. Well Tutored web tests.
-6. Smoke-check and publish-lifecycle tests.
+6. Smoke-check tests.
 7. `pnpm run build`, which checks documented commands, type-checks libraries
    and workspace packages, and builds the packages that define a build script.
 
 The command stops at the first failure and returns a non-zero exit code. It is
-the deterministic quality gate and does not depend on a running dev workflow
-or a published URL.
+the deterministic quality gate and does not depend on a running dev stack or a
+deployed URL.
 
-The `ci` validation command is also registered in Replit's validation system
-with `pnpm run verify:ci`. The registration is workspace-level configuration,
-not a file committed to this repository, so keep `verify:ci` in the root
-`package.json` as the source-controlled definition of the check. The command
-uses an externally supplied `TEST_DATABASE_URL` when one is available.
+The command uses an externally supplied `TEST_DATABASE_URL` when one is available.
 Otherwise, it provisions a temporary local PostgreSQL cluster for the run,
 exports its separate connection as `TEST_DATABASE_URL`, and removes the
 cluster when validation finishes. It never falls back to `DATABASE_URL`.
@@ -39,7 +35,7 @@ cluster when validation finishes. It never falls back to `DATABASE_URL`.
 CI is the only automated validation path that runs the database-backed API
 integration suite. Those tests create, update, publish, and delete test
 records, so they must use an isolated test database rather than a live
-environment. The `ci` workflow rejects a value equal to `DATABASE_URL` and
+environment. The gate rejects a value equal to `DATABASE_URL` and
 applies the current schema to the test connection before the API suite starts.
 If an external test URL is provided but is missing or the schema cannot be
 applied, validation stops with an actionable test-database error instead of
@@ -48,8 +44,8 @@ falling back to the application database.
 ## GitHub Actions
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs this same gate on
-every pull request and on pushes to `main`, so the check Replit registers is
-also the check that runs before a merge rather than only after one.
+every pull request and on pushes to `main`, and a push to `main` that passes it
+goes on to deploy. The gate therefore runs before a merge, not only after one.
 
 The workflow supplies a `postgres:16` service container and points
 `TEST_DATABASE_URL` at a `well_tutored_test` database that it creates first.
@@ -65,6 +61,9 @@ platform's native binaries from the lockfile. And pnpm is installed from the
 `packageManager` field rather than a version named in the workflow, so the pin
 that `docker/Dockerfile.dev` and the deployment build also depend on stays in
 one place.
+
+`docs:check` also reads this workflow's `run:` steps and validates the `pnpm`
+scripts they name, so a renamed script cannot reach a deploy job that calls it.
 
 No Clerk credentials are configured for the workflow, for the reasons below.
 
@@ -83,86 +82,78 @@ under JSDOM, and `test:smoke` exercises the smoke scripts' own logic rather
 than launching them against a running host.
 
 The one check that depends on a live Clerk instance is the Frontend API proxy
-assertion in the launch smoke check, which runs against a deployment and uses
-that deployment's own managed keys rather than anything CI supplies.
-Development smoke skips it, because the API server enables the proxy only in
-production.
+assertion in the launch smoke check, which runs against the Deployment and uses
+its own configured keys rather than anything CI supplies. Development smoke
+skips it, because the API server enables the proxy only in production, and the
+deploy job waives it while the Deployment is on a development Clerk instance.
 
 The dedicated test database is therefore the only external dependency the
 deterministic gate has.
 
-## Deployment gate
+## The deploy job
 
-The root deployment configuration runs the build-free
-`pnpm run verify:deploy` gate before the artifact-specific production builds.
-A non-zero result stops the publish before the new build can go live. The
-production artifact builds then run once through their normal deployment
-configuration.
+The `deploy` job in the same workflow runs only on a push to `main`, and only
+once `verify` has passed — `needs: verify` is what makes a failed verification
+stop a deploy. It checks out, installs `flyctl`, runs `flyctl deploy`, and then
+runs the launch smoke against the live site.
 
-The deployment gate runs the API server's `test:deploy` script, which includes
-only the non-mutating resource-type, publishability, and request-origin checks.
-It does not run the workspace lifecycle integration suite and therefore does
-not open a database connection for test setup. It also runs the web tests,
-local smoke-check tests, documentation checks, and type checks. `verify:ci`
-remains the complete pre-publish quality check, including the full API suite
-and a full build.
+It has its own `concurrency` group, without `cancel-in-progress`. The
+workflow-level group cancels superseded pull-request runs, which is right for
+verification and wrong for a deploy: a cancelled one leaves the Deployment
+wherever `flyctl` had got to. Deploys queue instead.
+
+It does **not** apply the schema. That is
+[ADR-0002](adr/0002-schema-by-deliberate-push.md), and it is the point.
 
 ## Development smoke validation
 
-After the API and web development workflows are running, validate the
-proxied development domain:
+With the local stack running, validate it through the Vite dev server, which
+proxies `/api` to the API service:
 
 ```sh
-SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:dev
-SMOKE_BASE_URL=https://$REPLIT_DEV_DOMAIN pnpm smoke:enquiry
+SMOKE_BASE_URL=http://localhost:5173 pnpm smoke:dev
 ```
 
 The development launch check validates health, catalogue data, public routes,
 and invalid-enquiry recovery. It intentionally skips the Clerk Frontend API
 proxy assertion because the API server only enables that proxy in production.
-The browser check validates the enquiry flow with keyboard navigation,
-validation recovery, retry behavior, and an announced success receipt. Its
-requests are intercepted so it does not create a real enquiry.
 
-The `dev-smoke` validation command is registered in Replit with the same
-development-domain target and the `smoke:dev` mode. It expects
-`REPLIT_DEV_DOMAIN` and fails rather than silently checking the wrong host when
-that variable is unavailable.
+`SMOKE_BASE_URL` is required and has no default, in every mode — see
+[launch-smoke-check.md](launch-smoke-check.md). Target the dev server rather
+than the API port directly, so the web application and `/api` are checked
+together.
 
-Use the proxied development domain instead of a direct Vite port so the web
-application and `/api` routes are checked together.
+The browser check (`pnpm smoke:enquiry`) validates the enquiry flow with
+keyboard navigation, validation recovery, retry behavior, and an announced
+success receipt. Its requests are intercepted so it does not create a real
+Enquiry. It needs `SMOKE_CHROMIUM_PATH`, which is why it is not in CI.
 
-## Publishing validation
+## Post-deploy validation
 
-The publication lifecycle runs the published launch smoke check through the
-root `postpublish` script:
+The deploy job finishes by running the launch smoke against the live site:
 
 ```sh
-pnpm run smoke:launch:published:lifecycle
+SMOKE_BASE_URL=https://well-tutored.fly.dev pnpm run smoke:launch:incomplete
 ```
 
-The lifecycle receives the current Publishing URL through
-`REPLIT_PUBLISHED_URL`, verifies that it matches the configured
-`SMOKE_PRODUCTION_URL`, and then checks the published API and public pages.
-The command fails if the URL is missing, malformed, mismatched, unhealthy, or
-redirects to another origin.
+A successful Deploy does not mean a usable Deployment, which is why this runs
+at all. The check fails if the site is unhealthy or redirects to another
+origin.
 
-This post-publish check remains necessary even after CI and dev validation:
-deployment rewrites, production environment configuration, domains, and
-published data can differ from development.
+`smoke:launch:incomplete` is the ordinary launch smoke with two waivers, for
+the two conditions this Deployment is still in: it has no published content,
+and its Clerk instance is a development one. Each has its own end. When the
+last one goes, this becomes `pnpm run smoke:launch`.
 
 ## Recommended release sequence
 
-1. Run the `ci` validation command. It prepares and uses only the dedicated
+1. Run `pnpm run verify:ci`. It prepares and uses only the dedicated
    integration-test database for database-backed tests.
-2. Start or refresh the API and web workflows.
-3. Run the `dev-smoke` validation command.
-4. Publish the app.
-5. Confirm the post-publish launch smoke check passes.
+2. Bring the local stack up and run the development smoke against it.
+3. Apply any schema change to the Deployment database first —
+   [ADR-0002](adr/0002-schema-by-deliberate-push.md).
+4. Merge. That deploys, and the deploy job runs the launch smoke.
 
-The committed `Project` workflow runs `ci` and then `dev-smoke` sequentially.
-This prevents development smoke checks from overlapping with CI's mutable
-integration-test work. The dev smoke command is intentionally separate from
-`verify:ci` because it depends on a live development environment. The published
-check is intentionally separate because it validates the deployment that users
-will access.
+The development smoke is deliberately separate from `verify:ci` because it
+needs a running stack, and the launch smoke is separate because it validates
+the Deployment visitors actually reach.

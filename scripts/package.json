@@ -12,11 +12,8 @@
     "smoke": "tsx ./src/smoke-check.ts",
     "smoke:dev": "tsx ./src/smoke-check.ts --dev",
     "smoke:incomplete": "tsx ./src/smoke-check.ts --allow-empty --dev-clerk-instance",
-    "smoke:published": "tsx ./src/smoke-check.ts --published",
-    "smoke:published:lifecycle": "tsx ./src/publish-smoke.ts",
     "smoke:enquiry": "tsx ./src/enquiry-browser-smoke.ts",
-    "smoke:enquiry:published": "tsx ./src/enquiry-browser-smoke.ts --published",
-    "test:smoke": "tsx --test ./src/smoke-check.test.ts ./src/publish-smoke.test.ts",
+    "test:smoke": "tsx --test ./src/smoke-check.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

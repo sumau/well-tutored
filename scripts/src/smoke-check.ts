@@ -1,14 +1,7 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ARTIFACT_DEPLOYMENT_CONFIG_URL = new URL(
-  "../../artifacts/well-tutored/.replit-artifact/artifact.toml",
-  import.meta.url,
-);
-const PRODUCTION_URL_CONFIG_KEY = "SMOKE_PRODUCTION_URL";
-const PUBLISHED_URL_ENV_KEY = "SMOKE_PUBLISHED_URL";
-const PUBLISHING_OUTPUT_URL_ENV_KEY = "REPLIT_PUBLISHED_URL";
+const BASE_URL_ENV_KEY = "SMOKE_BASE_URL";
 export const SMOKE_TIMEOUT_MIN_MS = 100;
 export const SMOKE_TIMEOUT_MAX_MS = 60_000;
 export const SMOKE_TOTAL_TIMEOUT_MIN_MS = 1_000;
@@ -16,7 +9,6 @@ export const SMOKE_TOTAL_TIMEOUT_MAX_MS = 300_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_TOTAL_TIMEOUT_MS = 60_000;
 const SMOKE_TIMEOUT_FORMAT = /^\d+$/;
-const PUBLISHED_CHECK_FLAG = "--published";
 const DEVELOPMENT_CHECK_FLAG = "--dev";
 // Both waivers are named for the condition under which passing them is
 // correct, not for what they skip: a stale one in CI should read as a bug.
@@ -171,107 +163,18 @@ function expectTutor(value: unknown, label: string): JsonRecord {
   return tutor;
 }
 
-function resolveArtifactProductionUrl(): { value: string; source: string } {
-  let artifactConfig: string;
-
-  try {
-    artifactConfig = readFileSync(ARTIFACT_DEPLOYMENT_CONFIG_URL, "utf8");
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new SmokeCheckError(
-      `Could not read the Well Tutored deployment configuration before making requests: ${reason}`,
-    );
-  }
-
-  const productionEnvSection = artifactConfig.match(
-    /(?:^|\n)\[services\.production\.env\]\s*\n([\s\S]*?)(?=\n(?:\[|\[\[)|$)/,
-  )?.[1];
-  const configuredUrl = productionEnvSection
-    ?.match(/^\s*SMOKE_PRODUCTION_URL\s*=\s*"([^"\r\n]*)"\s*$/m)?.[1]
-    ?.trim();
-
-  if (!configuredUrl) {
-    throw new SmokeCheckError(
-      `The Well Tutored deployment configuration must define ${PRODUCTION_URL_CONFIG_KEY} before making requests.`,
-    );
-  }
-
-  parseHttpUrl(configuredUrl, PRODUCTION_URL_CONFIG_KEY);
-
-  return {
-    value: configuredUrl,
-    source: PRODUCTION_URL_CONFIG_KEY,
-  };
-}
-
 function resolveConfiguredBaseUrl(): { value: string; source: string } {
-  const explicit = process.env.SMOKE_BASE_URL?.trim();
-  const isDevelopmentCheck = process.argv.includes(DEVELOPMENT_CHECK_FLAG);
-  const isPublishedCheck = process.argv.includes(PUBLISHED_CHECK_FLAG);
-
-  if (isDevelopmentCheck && isPublishedCheck) {
+  const explicit = process.env[BASE_URL_ENV_KEY]?.trim();
+  if (!explicit) {
     throw new SmokeCheckError(
-      "Development and published launch checks cannot run together.",
+      `${BASE_URL_ENV_KEY} must name the target of this check. There is no ` +
+        `default: the Deployment's origin is committed in fly.toml, and a ` +
+        `smoke check that infers its own target is one that can report on a ` +
+        `site nobody asked about.`,
     );
   }
 
-  if (isDevelopmentCheck && !explicit) {
-    throw new SmokeCheckError(
-      "Development launch check requires SMOKE_BASE_URL so it cannot accidentally target production.",
-    );
-  }
-
-  if (explicit) {
-    return { value: explicit, source: "SMOKE_BASE_URL" };
-  }
-
-  if (isPublishedCheck) {
-    const publishedUrlSource = process.env[PUBLISHED_URL_ENV_KEY]?.trim()
-      ? PUBLISHED_URL_ENV_KEY
-      : process.env[PUBLISHING_OUTPUT_URL_ENV_KEY]?.trim()
-        ? PUBLISHING_OUTPUT_URL_ENV_KEY
-        : undefined;
-    const publishedUrl = publishedUrlSource
-      ? process.env[publishedUrlSource]?.trim()
-      : undefined;
-    if (!publishedUrl) {
-      throw new SmokeCheckError(
-        `Published launch check requires ${PUBLISHED_URL_ENV_KEY} or ` +
-          `${PUBLISHING_OUTPUT_URL_ENV_KEY} from the current Publishing metadata. ` +
-          `The publish lifecycle must provide ${PUBLISHING_OUTPUT_URL_ENV_KEY}, ` +
-          `or set ${PUBLISHED_URL_ENV_KEY} manually. ` +
-          `Set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
-      );
-    }
-
-    const artifactUrl = resolveArtifactProductionUrl();
-    const publishedOrigin = parseHttpUrl(
-      publishedUrl,
-      publishedUrlSource ?? PUBLISHED_URL_ENV_KEY,
-    ).origin;
-    const artifactOrigin = parseHttpUrl(
-      artifactUrl.value,
-      artifactUrl.source,
-    ).origin;
-
-    if (publishedOrigin !== artifactOrigin) {
-      throw new SmokeCheckError(
-        `Published deployment URL (${publishedUrlSource ?? PUBLISHED_URL_ENV_KEY}) "${publishedOrigin}" ` +
-          `does not match the Well Tutored artifact smoke target ` +
-          `(${PRODUCTION_URL_CONFIG_KEY}) "${artifactOrigin}". ` +
-          `Update ${PRODUCTION_URL_CONFIG_KEY} in ` +
-          `artifacts/well-tutored/.replit-artifact/artifact.toml ` +
-          `after a domain change, or set SMOKE_BASE_URL for an intentional custom-domain or local check.`,
-      );
-    }
-
-    return {
-      value: publishedUrl,
-      source: publishedUrlSource ?? PUBLISHED_URL_ENV_KEY,
-    };
-  }
-
-  return resolveArtifactProductionUrl();
+  return { value: explicit, source: BASE_URL_ENV_KEY };
 }
 
 function parseHttpUrl(value: string, source: string): URL {
@@ -539,7 +442,7 @@ async function runSmokeCheckSteps(
   );
   let resources: unknown[];
   if (Array.isArray(resourceCatalogue)) {
-    // The currently published deployment uses the pre-pagination list shape.
+    // Tolerated for a Deployment still serving the pre-pagination list shape.
     resources = resourceCatalogue;
   } else {
     const catalogue = requireRecord(resourceCatalogue, "/api/resources");

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
 import {
   createServer,
   type IncomingMessage,
@@ -53,10 +52,6 @@ const resource = {
 };
 
 const scriptsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const artifactConfigPath = resolve(
-  scriptsRoot,
-  "../artifacts/well-tutored/.replit-artifact/artifact.toml",
-);
 
 function writeJson(
   response: ServerResponse<IncomingMessage>,
@@ -319,11 +314,8 @@ function runSmokeCommand(
   baseUrl: string | undefined,
   options: {
     development?: boolean;
-    published?: boolean;
     allowEmpty?: boolean;
     devClerkInstance?: boolean;
-    publishedUrl?: string;
-    publishedUrlSource?: "SMOKE_PUBLISHED_URL" | "REPLIT_PUBLISHED_URL";
     timeoutMs?: string;
     totalTimeoutMs?: string;
   } = {},
@@ -338,7 +330,6 @@ function runSmokeCommand(
       "--import",
       "tsx",
       smokeFile,
-      ...(options.published ? ["--published"] : []),
       ...(options.development ? ["--dev"] : []),
       ...(options.allowEmpty ? ["--allow-empty"] : []),
       ...(options.devClerkInstance ? ["--dev-clerk-instance"] : []),
@@ -348,17 +339,6 @@ function runSmokeCommand(
       env: {
         ...process.env,
         ...(baseUrl ? { SMOKE_BASE_URL: baseUrl } : { SMOKE_BASE_URL: "" }),
-        SMOKE_PUBLISHED_URL:
-          options.publishedUrl &&
-          (options.publishedUrlSource ?? "SMOKE_PUBLISHED_URL") ===
-            "SMOKE_PUBLISHED_URL"
-            ? options.publishedUrl
-            : "",
-        REPLIT_PUBLISHED_URL:
-          options.publishedUrl &&
-          options.publishedUrlSource === "REPLIT_PUBLISHED_URL"
-            ? options.publishedUrl
-            : "",
         SMOKE_TIMEOUT_MS: options.timeoutMs ?? "2000",
         SMOKE_TOTAL_TIMEOUT_MS: options.totalTimeoutMs ?? "60000",
       },
@@ -379,95 +359,7 @@ function runSmokeCommand(
   });
 }
 
-test("malformed SMOKE_PUBLISHED_URL fails before contacting loopback or production", async () => {
-  const fixture = await startFixture({
-    name: "unused published URL validation fixture",
-    expectedMessage: "",
-    respond: () => false,
-  });
-
-  try {
-    const result = await runSmokeCommand(undefined, {
-      published: true,
-      publishedUrl: "not-a-url",
-    });
-
-    assert.notEqual(result.exitCode, 0, result.output);
-    assert.match(
-      result.output,
-      /SMOKE_PUBLISHED_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
-    );
-    assert.deepEqual(fixture.requests, []);
-    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-  } finally {
-    await fixture.close();
-  }
-});
-
-test("malformed REPLIT_PUBLISHED_URL fails before contacting loopback or production", async () => {
-  const fixture = await startFixture({
-    name: "unused Publishing output URL validation fixture",
-    expectedMessage: "",
-    respond: () => false,
-  });
-
-  try {
-    const result = await runSmokeCommand(undefined, {
-      published: true,
-      publishedUrl: "not-a-url",
-      publishedUrlSource: "REPLIT_PUBLISHED_URL",
-    });
-
-    assert.notEqual(result.exitCode, 0, result.output);
-    assert.match(
-      result.output,
-      /REPLIT_PUBLISHED_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
-    );
-    assert.deepEqual(fixture.requests, []);
-    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-  } finally {
-    await fixture.close();
-  }
-});
-
-test("malformed SMOKE_PRODUCTION_URL fails before contacting loopback or production", async () => {
-  const fixture = await startFixture({
-    name: "unused production URL validation fixture",
-    expectedMessage: "",
-    respond: () => false,
-  });
-  const originalArtifactConfig = readFileSync(artifactConfigPath, "utf8");
-  const malformedArtifactConfig = originalArtifactConfig.replace(
-    /SMOKE_PRODUCTION_URL\s*=\s*"[^"\r\n]*"/,
-    'SMOKE_PRODUCTION_URL = "not-a-url"',
-  );
-  assert.notEqual(
-    malformedArtifactConfig,
-    originalArtifactConfig,
-    "expected the artifact production URL setting to be present",
-  );
-  writeFileSync(artifactConfigPath, malformedArtifactConfig);
-
-  try {
-    const result = await runSmokeCommand(undefined, {
-      published: true,
-      publishedUrl: "https://welltutored.replit.app",
-    });
-
-    assert.notEqual(result.exitCode, 0, result.output);
-    assert.match(
-      result.output,
-      /SMOKE_PRODUCTION_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
-    );
-    assert.deepEqual(fixture.requests, []);
-    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-  } finally {
-    writeFileSync(artifactConfigPath, originalArtifactConfig);
-    await fixture.close();
-  }
-});
-
-test("malformed SMOKE_BASE_URL fails before contacting loopback or production", async () => {
+test("malformed SMOKE_BASE_URL fails before making requests", async () => {
   const fixture = await startFixture({
     name: "unused URL validation fixture",
     expectedMessage: "",
@@ -483,7 +375,6 @@ test("malformed SMOKE_BASE_URL fails before contacting loopback or production", 
       /SMOKE_BASE_URL must be an absolute HTTP\(S\) URL; received "not-a-url"\./,
     );
     assert.deepEqual(fixture.requests, []);
-    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
   } finally {
     await fixture.close();
   }
@@ -523,8 +414,7 @@ for (const timeoutMs of [
           ),
         );
         assert.deepEqual(fixture.requests, []);
-        assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-      } finally {
+          } finally {
         await fixture.close();
       }
     },
@@ -564,32 +454,23 @@ for (const totalTimeoutMs of [
           ),
         );
         assert.deepEqual(fixture.requests, []);
-        assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
-      } finally {
+          } finally {
         await fixture.close();
       }
     },
   );
 }
 
-test("published check rejects missing current deployment metadata", async () => {
-  const result = await runSmokeCommand(undefined, { published: true });
+test("every mode requires an explicit target", async () => {
+  for (const options of [{}, { development: true }, { allowEmpty: true }]) {
+    const result = await runSmokeCommand(undefined, options);
 
-  assert.notEqual(result.exitCode, 0, result.output);
-  assert.match(
-    result.output,
-    /Published launch check requires SMOKE_PUBLISHED_URL or REPLIT_PUBLISHED_URL from the current Publishing metadata/,
-  );
-});
-
-test("development check requires an explicit development target", async () => {
-  const result = await runSmokeCommand(undefined, { development: true });
-
-  assert.notEqual(result.exitCode, 0, result.output);
-  assert.match(
-    result.output,
-    /Development launch check requires SMOKE_BASE_URL so it cannot accidentally target production/,
-  );
+    assert.notEqual(result.exitCode, 0, result.output);
+    assert.match(
+      result.output,
+      /SMOKE_BASE_URL must name the target of this check\. There is no default/,
+    );
+  }
 });
 
 test("development check skips the production-only Clerk proxy assertion", async () => {
@@ -759,46 +640,11 @@ test("--allow-empty waives nothing once the deployment has content", async () =>
   }
 });
 
-test("published check rejects a deployment domain that drifted from the artifact target", async () => {
-  const result = await runSmokeCommand(undefined, {
-    published: true,
-    publishedUrl: "https://custom.example",
-  });
-
-  assert.notEqual(result.exitCode, 0, result.output);
-  assert.match(
-    result.output,
-    /does not match the Well Tutored artifact smoke target/,
-  );
-  assert.match(
-    result.output,
-    /Update SMOKE_PRODUCTION_URL in artifacts\/well-tutored\/\.replit-artifact\/artifact\.toml/,
-  );
-});
-
-test("SMOKE_BASE_URL remains an explicit override for published checks", async () => {
-  const fixture = await startFixture({
-    name: "healthy override",
-    expectedMessage: "",
-    respond: () => false,
-  });
-
-  try {
-    const result = await runSmokeCommand(fixture.url, { published: true });
-    assert.equal(result.exitCode, 0, result.output);
-    assert.match(result.output, /Launch smoke check passed/);
-  } finally {
-    await fixture.close();
-  }
-});
-
-test("published target checks reject responses redirected to a different origin", async () => {
+test("launch checks reject responses redirected to a different origin", async () => {
   const fixture = await startRedirectFixture();
 
   try {
-    const result = await runSmokeCommand(fixture.sourceUrl, {
-      published: true,
-    });
+    const result = await runSmokeCommand(fixture.sourceUrl);
     const escapedSourceUrl = fixture.sourceUrl.replace(
       /[.*+?^${}()|[\]\\]/g,
       "\\$&",
@@ -940,7 +786,6 @@ test("healthy launch checks pass entirely against the loopback fixture", async (
       "POST /api/enquiries",
       "GET /api/healthz",
     ]);
-    assert.doesNotMatch(result.output, /welltutored\.replit\.app/);
   } finally {
     await fixture.close();
   }

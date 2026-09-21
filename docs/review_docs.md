@@ -1,6 +1,6 @@
 # Documentation review
 
-Review `replit.md` and every Markdown file matching `docs/**/*.md` against the
+Review `PROJECT.md` and every Markdown file matching `docs/**/*.md` against the
 current codebase in this same repository.
 
 Inspect relevant source files, package manifests, workflows, API routes,
@@ -28,7 +28,7 @@ repository root.
 - `dist/**`
 - Generated output
 - `attached_assets/**`
-- Any other Replit project or shared workspace
+- Any repository other than this one
 
 ## Rules
 
@@ -64,14 +64,13 @@ environment variables, and operating procedures.
 - Documented file paths and project structure match the repository.
 - Architecture and route descriptions match the implementation.
 - Environment-variable and setup instructions are accurate.
-- Contradictions between `replit.md` and `docs/` are resolved.
+- Contradictions between `PROJECT.md` and `docs/` are resolved.
 - Updated documentation is checked against the relevant source files.
 
 ## Out of scope
 
 - Changing application behavior solely to match outdated documentation
 - Rewriting the documentation structure
-- Updating Replit-provided skill files
 - Updating task plans or Agent memory files
 
 ## Steps

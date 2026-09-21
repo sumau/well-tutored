@@ -1,6 +1,6 @@
-# Local development stack. Replit's router normally fronts both artifacts on a
-# single domain; here the Vite dev server proxies /api to the API service
-# instead (see artifacts/well-tutored/vite.config.ts).
+# Local development stack. The Deployment serves the frontend and the API from
+# one origin; here the Vite dev server proxies /api to the API service instead
+# (see artifacts/well-tutored/vite.config.ts).
 name: well-tutored
 
 x-node: &node
@@ -146,8 +146,9 @@ services:
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@db:5432/well_tutored
-      # The published origin. Off Replit nothing supplies this, and without it
-      # every credentialed request is rejected — including the enquiry POST.
+      # This container's own origin. Nothing supplies it by default, and
+      # without it every credentialed request is rejected — the enquiry POST
+      # included.
       TRUSTED_ORIGINS: http://localhost:8081
     env_file:
       - path: .env
