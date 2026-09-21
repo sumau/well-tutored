@@ -297,11 +297,14 @@ things behave differently and neither is a fault:
 
 - The directory and resource library render their empty states, and `/api/tutors`
   returns an empty list.
-- `pnpm run smoke:launch` **fails**, because it asserts at least one published
-  tutor and one published resource. `pnpm run smoke:launch:incomplete` waives
-  exactly those assertions, and is what CI runs while the Deployment is empty.
-  Everything that does not depend on content still runs. Drop back to
-  `smoke:launch` once there is content, and delete the waived variant:
+- `pnpm run smoke:launch`, run by hand, **fails**, because it asserts at least
+  one published tutor and one published resource.
+  `pnpm run smoke:launch:incomplete` waives exactly those assertions, and is
+  what CI runs while the Deployment is empty. Everything that does not depend on
+  content still runs. The two are easy to conflate: **the deploy job's Launch
+  smoke step is green on an empty Deployment**, so a red one there is a genuine
+  failure rather than this expected state. Drop back to `smoke:launch` once
+  there is content, and delete the waived variant:
 
   ```
   SMOKE_BASE_URL=https://well-tutored.fly.dev pnpm run smoke:launch
