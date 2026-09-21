@@ -1,13 +1,14 @@
-# Deterministic repository verification, as defined by `pnpm run verify:ci`.
-# docs/ci-validation.md is the description of what that gate covers and why;
-# this file only supplies the environment it needs.
+# Deterministic repository verification, as defined by `pnpm run verify:ci`,
+# and then the deploy. docs/ci-validation.md is the description of what the
+# verification gate covers and why; this file only supplies the environment it
+# needs.
 #
-# Deliberately absent: the development and published smoke checks. They depend
-# on a live Replit development domain or deployment, so they stay where they
-# already run — the Replit `Project` workflow and the root `postpublish`
-# script. No Clerk credentials either: the suite is expected to pass with
-# CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, and VITE_CLERK_PUBLISHABLE_KEY all
-# absent, so giving CI secrets would weaken that guarantee rather than test it.
+# Deliberately absent: the development smoke check, which depends on a live
+# Replit development domain and stays in the Replit `Project` workflow, and
+# the Playwright enquiry smoke, which needs a browser. No Clerk credentials
+# for `verify` either: the suite is expected to pass with CLERK_SECRET_KEY,
+# CLERK_PUBLISHABLE_KEY, and VITE_CLERK_PUBLISHABLE_KEY all absent, so giving
+# CI secrets would weaken that guarantee rather than test it.
 name: CI
 
 on:
@@ -90,3 +91,57 @@ jobs:
       # would break the Replit deployment build fails here instead.
       - name: Verify
         run: pnpm run verify:ci
+
+  # Merging to main ships. Nothing else does: a pull request run stops at
+  # `verify`, and `needs` keeps a failed verification from deploying.
+  deploy:
+    name: deploy
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Its own group, and without cancel-in-progress. The workflow-level group
+    # cancels superseded pull-request runs, which is right for verification and
+    # wrong here: a cancelled deploy leaves the Deployment wherever flyctl had
+    # got to. Queue them instead.
+    concurrency:
+      group: deploy-well-tutored
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # No build arguments: fly.toml already carries
+      # VITE_CLERK_PUBLISHABLE_KEY under [build.args], which is where it
+      # belongs — Vite compiles it into the browser bundle at build time, so a
+      # Fly secret would not exist yet.
+      #
+      # This does not apply the schema. Pushing it is a deliberate, separate
+      # act — see docs/adr/0002-schema-by-deliberate-push.md.
+      - name: Deploy to Fly
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A Deploy succeeding does not mean the Deployment is usable. The launch
+      # smoke is fetch-based, so no browser is needed here.
+      #
+      # The waiver is correct only while the Deployment has no published
+      # content. When it has some, this becomes `pnpm run smoke:launch` and
+      # both --allow-empty script entries go with it.
+      - name: Launch smoke
+        env:
+          SMOKE_BASE_URL: https://well-tutored.fly.dev
+        run: pnpm run smoke:launch:allow-empty
