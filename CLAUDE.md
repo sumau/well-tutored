@@ -10,16 +10,6 @@ Keep it that way. When something changes that belongs in a project brief,
 update `PROJECT.md`, not this file. This file covers only what differs when
 working through Claude Code.
 
-## Replit is being removed
-
-[REPLIT-REMOVAL-PLAN.md](REPLIT-REMOVAL-PLAN.md) is the plan: three ordered
-changes, with the ordering constraint and the file-level change sets. Changes 1
-and 2 have landed; change 3, the `studio_account_role` rename, has not.
-
-[CONTEXT.md](CONTEXT.md) is the glossary and [docs/adr/](docs/adr/) holds the
-decisions behind the move. Delete this section and the plan when change 3
-lands.
-
 ## Running things here
 
 Everything runs in containers — there is no host Node, pnpm, or PostgreSQL.

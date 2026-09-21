@@ -72,10 +72,14 @@ unmanaged one is something Fly's documentation now says they cannot support.
 Nothing applies the schema for you, and the Deploy job deliberately does not —
 [ADR-0002](adr/0002-schema-by-deliberate-push.md) is why. Drizzle's `push` is
 the only mechanism this project has; run it deliberately against the Deployment
-database from a checkout:
+database from a checkout.
+
+Export that connection string once per shell, then pass it in **expanded**:
 
 ```
-docker compose run --rm -e DATABASE_URL='postgres://...' --entrypoint bash migrate \
+export DATABASE_URL='postgres://...?sslmode=require'
+
+docker compose run --rm -e DATABASE_URL="$DATABASE_URL" --entrypoint bash migrate \
   -lc 'pnpm --filter @workspace/db run push'
 ```
 
@@ -84,11 +88,16 @@ it, so the connection string has to be supplied here.
 
 Three things about that command:
 
-- **`-e DATABASE_URL` is load-bearing.** `docker-compose.yml` sets
-  `DATABASE_URL` on the `migrate` service to the local development database, and
-  an explicit `environment:` entry beats anything from `.env`. Omit the
-  override and you push to your local container instead of the Deployment,
-  successfully and silently.
+- **Pass `-e DATABASE_URL="$DATABASE_URL"`, expanded, not bare `-e
+  DATABASE_URL`.** `docker-compose.yml` sets `DATABASE_URL` on the `migrate`
+  service to the local development database, and an explicit `environment:`
+  entry beats anything from `.env`. The bare form asks Compose to forward the
+  variable from your shell, and when that forwarding does not happen the service
+  default applies — so you push to your local container instead of the
+  Deployment, successfully and quietly. The expanded form cannot fail that way:
+  your shell substitutes the value before Docker sees it, and an unset variable
+  passes an empty string, which fails loudly with `DATABASE_URL, ensure the
+  database is provisioned` instead of silently choosing the wrong database.
 - **`?sslmode=require`** belongs on the connection string, for the reason given
   under [Database](#database) above.
 - **Use Neon's direct connection string here**, not the pooled one — the
@@ -97,18 +106,61 @@ Three things about that command:
 
 `push` prompts before anything destructive. Read the prompt, and review the diff
 of `lib/db/src/schema/` first — nothing downstream asks. Against an empty
-database there is nothing to drop, so a prompt there means the connection string
-is not pointing where you think it is.
+database there is nothing to drop, so a *truncate* prompt there means the
+connection string is not pointing where you think it is.
 
-Check what landed:
+**Renames are the exception, and they prompt on any database, empty or not.**
+`push` diffs states, so it cannot tell a renamed type or constraint from a
+dropped one and a new one — it asks. The highlighted default is `create`, which
+is the drop-and-recreate; the rename is the line below it:
 
 ```
-docker compose run --rm -e DATABASE_URL='postgres://...' --entrypoint bash migrate \
-  -lc 'psql "$DATABASE_URL" -c "\dt"'
+Is workspace_account_role enum created or renamed from another enum?
+❯ + workspace_account_role                       create enum
+  ~ studio_account_role › workspace_account_role rename enum
+```
+
+Answered as a rename it emits `ALTER TYPE ... RENAME TO ...` and touches no
+rows. Answered with the default it creates the new type, casts the column across
+with `USING role::text::<new type>`, restores the default and drops the old
+type — which, for a pure rename where the label set is unchanged, lands on the
+same state. Verified against a populated table: rows survive intact, and a
+second `push` reports no changes.
+
+The default is only dangerous when the rename also **changes the labels**. Then
+the cast through `text` fails on any row holding a label the new type lacks, and
+you get a partly applied push instead of a clean one. Pick the rename line
+anyway — it is the honest description of the change, and it does not depend on
+the labels happening to match.
+
+Renaming a constraint additionally asks whether to truncate the table before
+adding the new one — answer no; the default is already no.
+
+Check what landed, and check *where* it landed at the same time:
+
+```
+docker compose run --rm -e DATABASE_URL="$DATABASE_URL" --entrypoint bash migrate \
+  -lc 'psql "$DATABASE_URL" -c "\conninfo" -c "\dt"'
 ```
 
 `tutors`, `resources`, `enquiries` and `workspace_accounts` should all be
 listed.
+
+Read the `\conninfo` line first, and read it twice. It names the host you
+actually reached, and it is the only output here that distinguishes the
+Deployment from your local container — the table list looks the same either way.
+There are two ways to be somewhere you did not intend:
+
+- **Host `db` at port `5432`** — the environment variable did not reach the
+  container and you are inspecting, or pushing to, the local database.
+- **A hostname containing `-pooler`** — you are on the pooled endpoint, which is
+  the application's, not the one for schema work. Drop `-pooler` from the
+  hostname to get the direct endpoint. `push` against the pooled endpoint can
+  report success without converging, so a `push` that keeps finding the same
+  changes run after run is the symptom to watch for.
+
+On the Deployment `workspace_accounts` is empty until the owner bootstrap runs,
+so a non-zero count is itself a sign you are on the wrong database.
 
 ## Clerk keys
 
@@ -151,6 +203,12 @@ fly apps create well-tutored
 fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
   CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
+
+Spell that connection string out rather than reusing the `DATABASE_URL` you
+exported for [schema work](#applying-the-schema). They are different strings:
+this one is the **pooled** endpoint the application runs against, the other is
+the **direct** endpoint for DDL. Passing the direct one here works and then
+quietly costs you connection pooling in production.
 
 `fly launch --no-deploy` also works, but it rewrites the committed `fly.toml`
 from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
