@@ -11,7 +11,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { tutorsTable } from "./tutors";
 
-export const workspaceAccountRole = pgEnum("studio_account_role", [
+export const workspaceAccountRole = pgEnum("workspace_account_role", [
   "owner",
   "tutor",
   "pending",
@@ -37,8 +37,8 @@ export const workspaceAccountsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    unique("studio_accounts_clerk_user_id_unique").on(table.clerkUserId),
-    unique("studio_accounts_tutor_id_unique").on(table.tutorId),
+    unique("workspace_accounts_clerk_user_id_unique").on(table.clerkUserId),
+    unique("workspace_accounts_tutor_id_unique").on(table.tutorId),
   ],
 );
 

@@ -40,9 +40,7 @@ Workspace routes are protected by Clerk and the workspace account boundary:
 
 `/workspace/articles/new` and `/workspace/articles/:id` remain compatibility
 aliases and redirect to the canonical resource URLs. Workspace accounts are
-stored in the `workspace_accounts` table; the existing `studio_account_role`
-enum remains a legacy database identifier to avoid an unnecessary second schema
-migration.
+stored in the `workspace_accounts` table.
 
 ## API boundaries
 
