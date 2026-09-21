@@ -71,9 +71,8 @@ app.use(express.urlencoded({ extended: true }));
 // a document request and answers it with a handshake redirect (307) when it
 // cannot establish a session — which is every page load once this server serves
 // the frontend itself, so a browser would bounce to Clerk instead of ever
-// receiving the app. Under Replit's router the frontend was served elsewhere and
-// this middleware only ever saw API requests; mounting it at /api keeps it that
-// way. The SPA authenticates client-side through @clerk/react.
+// receiving the app. Mounting it at /api keeps it to API requests. The SPA
+// authenticates client-side through @clerk/react.
 app.use(
   "/api",
   clerkMiddleware((req) => ({

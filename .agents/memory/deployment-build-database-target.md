@@ -1,10 +1,18 @@
 ---
-name: Deployment build database target
-description: This project's Replit deployment pre-build command receives the production PostgreSQL database.
+name: Deploy does not touch the database
+description: The Deploy pipeline never applies the schema or runs mutating tests against the Deployment database.
 ---
 
-For this project, the `.replit` deployment build runs with the production database connection. The read-only identity check reported `neondb` during a successful publish, while development reports `heliumdb`.
+The Deploy job builds and ships the container and then runs the launch smoke
+against it. It opens no connection to the Deployment database, applies no
+schema, and runs no mutating tests.
 
-**Why:** The deployment build runs the API lifecycle tests after connecting to `neondb`, so those tests can mutate production data before the new release is promoted.
+**Why:** This project previously ran its deployment build against the
+production database, so API lifecycle tests could mutate production data before
+a release was promoted. Schema changes were separately applied by a post-merge
+`push --force` that nobody reviewed.
 
-**How to apply:** Keep mutating integration tests out of the deployment build. Run them against an isolated test database in CI, and reserve the deployment gate for non-mutating checks.
+**How to apply:** Keep mutating integration tests in CI against an isolated
+test database. Apply schema changes by a deliberate `push` from a checkout,
+before merging anything that expects them — see
+`docs/adr/0002-schema-by-deliberate-push.md`.

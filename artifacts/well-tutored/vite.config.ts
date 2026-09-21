@@ -4,8 +4,6 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 
-import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
-
 const rawPort = process.env.PORT ?? '22104';
 
 const port = Number(rawPort);
@@ -16,7 +14,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? '/';
 
-// Replit's router serves the frontend and the API from one origin, so the app
+// The Deployment serves the frontend and the API from one origin, so the app
 // calls /api with relative paths. Locally the two run on separate ports, and
 // without this proxy /api falls through to Vite's history fallback.
 const apiProxyTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:8080';
@@ -74,20 +72,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== 'production' &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import('@replit/vite-plugin-cartographer').then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, '..'),
-            }),
-          ),
-          await import('@replit/vite-plugin-dev-banner').then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {

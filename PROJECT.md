@@ -2,33 +2,38 @@
 
 Well Tutored helps families discover women tutors, read tutor-written resources, and send named-tutor enquiries.
 
+The vocabulary every package shares is in [CONTEXT.md](CONTEXT.md), and the
+decisions a reader will question are in [docs/adr/](docs/adr/).
+
 ## Run & Operate
 
 - `PORT=8080 pnpm --filter @workspace/api-server run dev` — run the API server
-  directly outside the managed artifact workflow
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
+- `pnpm run build` — docs check + typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/db run push` — apply schema changes, deliberately and by hand ([ADR-0002](docs/adr/0002-schema-by-deliberate-push.md))
 - `pnpm run prepare:test-database` — validate `TEST_DATABASE_URL` and apply the
   current schema to the dedicated integration-test database
 - Required env: `DATABASE_URL` for PostgreSQL access; `VITE_CLERK_PUBLISHABLE_KEY` for the Well Tutored frontend; and `CLERK_PUBLISHABLE_KEY` for the API's Clerk middleware
 - Integration tests require a separate `TEST_DATABASE_URL`. The integration test script sets `NODE_ENV=test`, so the database package uses `TEST_DATABASE_URL` only for that process and rejects a test URL identical to `DATABASE_URL`. `pnpm run verify:ci` provisions a temporary local PostgreSQL connection when no dedicated URL is supplied, or uses the supplied dedicated URL, then applies the current schema before running the API suite.
-- The committed `Project` workflow runs CI before `dev-smoke`, so development smoke checks do not overlap with mutable integration-test work.
-- Production-only API env: `CLERK_SECRET_KEY` enables the Clerk Frontend API proxy used by the production deployment. It is not required for development previews.
+- Production-only API env: `CLERK_SECRET_KEY` enables the Clerk Frontend API proxy used by the Deployment. It is not required for development previews.
+
+Everything above runs in containers here — see
+[docs/local-docker.md](docs/local-docker.md) for the prefixes.
 
 ## Deploying
 
-Replit publishes this repository: its router fronts both artifacts on one
-domain, and `pnpm run verify:deploy` is the build gate.
+**Merging to `main` ships.** CI deploys the container to Fly and then runs the
+launch smoke against it; nothing else deploys. `docker/Dockerfile` and
+`fly.toml` are the whole configuration, and
+[docs/deploy.md](docs/deploy.md) is the walkthrough.
 
-The same app also deploys as a single container to any container host, where the
-API serves the frontend build itself because there is no router to do it.
-`docker/Dockerfile` and `fly.toml` cover that; see
-[docs/deploy.md](docs/deploy.md). The trap worth knowing either way: off Replit
-`TRUSTED_ORIGINS` must name the public origin explicitly, because the
-`REPLIT_DOMAINS` fallback is gone and an empty trusted-origin set rejects every
-credentialed request.
+Schema changes are not part of that. Apply them yourself, before merging
+anything that expects them — [ADR-0002](docs/adr/0002-schema-by-deliberate-push.md).
+
+The trap worth knowing: `TRUSTED_ORIGINS` must name the public origin exactly.
+Nothing infers it, and an empty trusted-origin set rejects every credentialed
+request, the public enquiry included.
 
 ## Stack
 
@@ -50,10 +55,11 @@ credentialed request.
 
 ## Architecture decisions
 
+- The frontend and the API are served from one origin, by one container — [ADR-0001](docs/adr/0001-single-origin-deployment.md).
 - The public site remains accessible without an account; Clerk gates only the private workspace.
 - `clerkMiddleware` is mounted under `/api` rather than globally: Clerk answers
-  `text/html` requests with a handshake redirect, which would intercept every
-  page load in a deployment where the API also serves the frontend build.
+  `text/html` requests with a handshake redirect, which would otherwise
+  intercept every page load, since the API also serves the frontend build.
 - Browser API requests use Clerk's same-origin session cookies; bearer-token wiring is reserved for mobile clients.
 - Public tutor/resource content is served through the API and seeded for a useful first preview.
 - OpenAPI generates both React Query hooks and Zod schemas to keep client/server contracts aligned.
@@ -65,9 +71,7 @@ The public experience presents women tutors educated at Russell Group universiti
 ## Gotchas
 
 - Run `pnpm --filter @workspace/api-spec run codegen` after changing `lib/api-spec/openapi.yaml`.
-- The managed workflows provide artifact `PORT` and `BASE_PATH`; the Vite configs also include local-build defaults.
-- Development Clerk keys are expected in preview; the production app receives its own managed environment.
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- The Vite configs default artifact `PORT` and `BASE_PATH`; compose and the
+  images override them.
+- The Deployment runs on a development Clerk instance until a custom domain
+  exists, which is why the launch smoke in CI waives the Clerk proxy assertion.

@@ -1,11 +1,10 @@
 - [Clerk test isolation](clerk-test-isolation.md) — stub the shared user API prototype because the client accessor can return transient objects.
-- [Local browser smoke routing](local-browser-smoke-routing.md) — use the proxied development domain for browser checks; direct Vite ports do not proxy `/api`.
-- [Replit publish smoke validation](replit-publish-smoke-validation.md) — post-publish checks need an explicit lifecycle integration and newly published URL.
+- [Local browser smoke routing](local-browser-smoke-routing.md) — target the Vite dev server for browser checks; it is what proxies `/api`.
 - [Web artifact component tests](web-artifact-component-tests.md) — run tsx tests with the web app tsconfig when importing @ aliases and JSX components.
 - [Mutation submission races](mutation-submission-races.md) — use a synchronous in-flight latch when repeated events can arrive before React mutation state rerenders.
 - [Public/auth startup boundary](public-auth-boundary.md) — keep public route modules Clerk-free and defer auth/workspace code behind path-based lazy loading.
 - [JSDOM page test harness](jsdom-page-test-harness.md) — install global location/history/event listeners when rendering Wouter pages with tsx and JSDOM.
-- [Development smoke checks](development-smoke-checks.md) — dev Clerk proxying is intentionally disabled, so dev smoke must use explicit target mode and skip only that production assertion.
-- [Deployment build database target](deployment-build-database-target.md) — this project's deployment pre-build command receives the production PostgreSQL database.
+- [Development smoke checks](development-smoke-checks.md) — dev Clerk proxying is intentionally disabled, so dev smoke skips only that production assertion; every mode needs an explicit target.
+- [Deploy does not touch the database](deployment-build-database-target.md) — the Deploy job never applies the schema or runs mutating tests against it.
 - [Clean integration fixtures](clean-integration-fixtures.md) — lifecycle tests must create every baseline row they assert against; isolated databases do not contain application seed data.
 - [PostgreSQL data snapshots](postgres-data-snapshots.md) — raw pg_dump output is not stable enough for before/after mutation checks; hash normalized catalog-derived row summaries instead.

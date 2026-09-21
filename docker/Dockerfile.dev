@@ -13,7 +13,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Pinned to the version in the root package.json "packageManager" field, so
-# the image, Replit, and CI all resolve the same pnpm and leave pnpm-lock.yaml
+# the image and CI both resolve the same pnpm and leave pnpm-lock.yaml
 # alone. Keep the two in step when either moves.
 RUN npm install -g pnpm@10.34.5 && npm cache clean --force
 

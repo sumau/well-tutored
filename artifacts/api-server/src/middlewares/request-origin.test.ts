@@ -19,7 +19,6 @@ test("normalizes only origin-shaped values", () => {
 test("uses configured origins instead of widening to defaults", () => {
   const environment = {
     NODE_ENV: "development",
-    REPLIT_DEV_DOMAIN: "preview.example",
     TRUSTED_ORIGINS: "https://app.example, http://localhost:4200",
   };
 
@@ -28,30 +27,33 @@ test("uses configured origins instead of widening to defaults", () => {
     ["http://localhost:4200", "https://app.example"],
   );
   assert.equal(isTrustedOrigin("https://app.example", environment), true);
-  assert.equal(isTrustedOrigin("https://preview.example", environment), false);
+  assert.equal(isTrustedOrigin("http://localhost:5173", environment), false);
 });
 
-test("derives development and production origins from their environment", () => {
+test("falls back to the local defaults in development and to nothing in production", () => {
+  assert.deepEqual(
+    [...getTrustedOrigins({ NODE_ENV: "development", PORT: "8080" })].sort(),
+    [
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:8080",
+      "http://localhost:5173",
+      "http://localhost:8080",
+    ],
+  );
+  // A production Deployment names its origin in fly.toml or trusts nothing.
+  // There is no environment left to infer one from, and an empty set rejects
+  // every credentialed request rather than guessing.
+  assert.deepEqual([...getTrustedOrigins({ NODE_ENV: "production" })], []);
   assert.equal(
-    isTrustedOrigin("https://preview.example", {
-      NODE_ENV: "development",
-      REPLIT_DEV_DOMAIN: "preview.example",
-    }),
-    true,
+    isTrustedOrigin("https://app.example", { NODE_ENV: "production" }),
+    false,
   );
   assert.equal(
     isTrustedOrigin("https://app.example", {
       NODE_ENV: "production",
-      REPLIT_DOMAINS: "app.example",
+      TRUSTED_ORIGINS: "https://app.example",
     }),
     true,
-  );
-  assert.equal(
-    isTrustedOrigin("https://preview.example", {
-      NODE_ENV: "production",
-      REPLIT_DOMAINS: "app.example",
-    }),
-    false,
   );
 });
 

@@ -3,10 +3,10 @@
 # verification gate covers and why; this file only supplies the environment it
 # needs.
 #
-# Deliberately absent: the development smoke check, which depends on a live
-# Replit development domain and stays in the Replit `Project` workflow, and
-# the Playwright enquiry smoke, which needs a browser. No Clerk credentials
-# for `verify` either: the suite is expected to pass with CLERK_SECRET_KEY,
+# Deliberately absent: the development smoke check, which needs a running local
+# stack to point at, and the Playwright enquiry smoke, which needs a browser
+# this runner does not carry. No Clerk credentials for `verify` either: the
+# suite is expected to pass with CLERK_SECRET_KEY,
 # CLERK_PUBLISHABLE_KEY, and VITE_CLERK_PUBLISHABLE_KEY all absent, so giving
 # CI secrets would weaken that guarantee rather than test it.
 name: CI
@@ -88,7 +88,7 @@ jobs:
       # API suite (including the database-backed workspace lifecycle tests), the
       # web tests, the smoke-check tests, and finally `pnpm run build` — which
       # is where docs:check and the full typecheck live, so a doc edit that
-      # would break the Replit deployment build fails here instead.
+      # would break the deployment build fails here instead.
       - name: Verify
         run: pnpm run verify:ci
 

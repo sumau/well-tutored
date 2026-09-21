@@ -1,19 +1,57 @@
 # Launch smoke check
 
-Run the non-mutating production check manually:
+The Launch Smoke asserts that a Deployment is *usable*, which a successful
+Deploy does not imply. It needs no workspace credentials and writes nothing.
 
 ```sh
-pnpm smoke:launch
+SMOKE_BASE_URL=https://well-tutored.fly.dev pnpm smoke:launch
 ```
 
-The default target is the production URL in the Well Tutored artifact
-deployment configuration (`artifacts/well-tutored/.replit-artifact/artifact.toml`).
-That value is the single source used by both manual and post-publish checks. To
-check another published domain, override it explicitly:
+`SMOKE_BASE_URL` is required and has no default. Nothing infers the target: the
+Deployment's origin is committed in `fly.toml`, and a check that picks its own
+target is one that can report on a site nobody asked about.
+
+## What it checks
+
+- the API health response at `/api/healthz`;
+- the Clerk Frontend API proxy at `/api/__clerk/v1/environment`;
+- tutor and resource catalogue responses, including non-empty published data
+  and the response fields used by public catalogue links;
+- the public home, resources, enquiry, tutor-profile, and resource-detail
+  pages, each requested with `Accept: text/html`;
+- invalid enquiry recovery by sending `{}` to `POST /api/enquiries`, expecting
+  a `400` validation response, and checking health again afterward.
+
+Every request must also finish on the origin it was sent to. A target that
+redirects elsewhere fails the check and reports both origins, so an old
+hostname redirecting to a replacement is caught before its responses are
+treated as healthy.
+
+The command exits non-zero on any failed check.
+
+## Waivers
+
+Three flags waive an assertion the target genuinely cannot meet. Each is named
+for the condition under which passing it is correct, not for what it skips, so
+a stale one reads as a bug rather than as configuration. A waived check is
+reported as skipped rather than silently dropped.
+
+| Flag | Waives | Ends when |
+| --- | --- | --- |
+| `--dev` | the Clerk proxy check, which the API enables only in production | never; development is a permanent mode |
+| `--allow-empty` | the non-empty assertions on `/api/tutors`, `/api/resources` and the pages that address a Tutor or Resource by slug | the Deployment has published content |
+| `--dev-clerk-instance` | the Clerk proxy check, which answers `host_invalid` for a development instance whatever the Deployment's health | the Deployment moves to a production Clerk instance |
+
+Two scripts wrap them:
 
 ```sh
-SMOKE_BASE_URL=https://example.replit.app pnpm smoke:launch
+SMOKE_BASE_URL=http://prod:8080 pnpm smoke:dev
+SMOKE_BASE_URL=https://well-tutored.fly.dev pnpm smoke:launch:incomplete
 ```
+
+`smoke:launch:incomplete` carries the last two flags together and is what the
+deploy job in `.github/workflows/ci.yml` runs. When both conditions have ended
+it becomes `pnpm run smoke:launch`, and the two script entries go with it.
 
 ## Timeout controls
 
@@ -25,9 +63,9 @@ the complete check:
 - `SMOKE_TOTAL_TIMEOUT_MS` — overall launch-check timeout. Defaults to `60000`
   ms and accepts integer values from `1000` through `300000` ms.
 
-When a published target is intentionally slower, override the relevant values
-for that run. Increase the overall timeout as well if the complete sequence
-needs more time:
+When a target is intentionally slower, override the relevant values for that
+run. Increase the overall timeout as well if the complete sequence needs more
+time:
 
 ```sh
 SMOKE_TIMEOUT_MS=30000 SMOKE_TOTAL_TIMEOUT_MS=120000 pnpm smoke:launch
@@ -37,75 +75,18 @@ These controls do not disable the checks or allow requests to continue past the
 overall deadline. Values outside the supported ranges, or values that are not
 whole numbers of milliseconds, fail before requests are made.
 
-The root package also registers a `postpublish` lifecycle hook. It runs the
-strict published-target variant automatically. The lifecycle receives the URL
-reported by the current Publishing run through `REPLIT_PUBLISHED_URL` and
-passes it to the smoke command as `SMOKE_PUBLISHED_URL`:
+## The enquiry browser check
+
+The enquiry form also has a real-browser keyboard smoke check. It traverses the
+form with native Tab and Enter actions, verifies validation recovery and
+disabled-submit behavior, and intercepts the final response so the check never
+creates a real Enquiry.
 
 ```sh
-REPLIT_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:launch:published:lifecycle
+SMOKE_BASE_URL=https://well-tutored.fly.dev \
+  SMOKE_CHROMIUM_PATH=/path/to/chromium pnpm smoke:enquiry
 ```
 
-If the Publishing output is unavailable, the lifecycle fails before making
-requests with an actionable error. It never substitutes the checked-in
-`SMOKE_PRODUCTION_URL` value or `REPLIT_DOMAINS`, which can point to a
-development domain. For a direct manual run, provide the current URL explicitly:
-
-```sh
-SMOKE_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:launch:published
-```
-
-Published mode compares `SMOKE_PUBLISHED_URL` with
-`SMOKE_PRODUCTION_URL` in the artifact deployment configuration before making
-requests. If they differ, update the artifact value after a domain change and
-rerun the check. Missing or mismatched metadata fails with an actionable
-message instead of silently checking an older deployment.
-
-`SMOKE_BASE_URL` remains available as an explicit override for custom domains
-and local verification, including the published command:
-
-```sh
-SMOKE_BASE_URL=https://example.test pnpm smoke:launch:published
-```
-
-When the override is set, it intentionally skips the published-target
-synchronization comparison. The artifact deployment configuration must still
-be readable and define a valid URL for the default manual check.
-Every request still must finish on the configured target origin. If the target
-redirects to a different origin, the check fails and reports both the
-configured and final origins. This catches an old published hostname that
-redirects to a replacement domain before its responses are treated as healthy.
-The smoke command exits non-zero on any failed check, which makes the failure
-visible in the publish output.
-
-The check does not require workspace credentials. It verifies:
-
-- the API health response at `/api/healthz`;
-- the Clerk Frontend API proxy at `/api/__clerk/v1/environment`;
-- tutor and resource catalogue responses, including non-empty published data
-  and the response fields used by public catalogue links;
-- the public home, resources, enquiry, tutor-profile, and resource-detail
-  pages;
-- invalid enquiry recovery by sending `{}` to `POST /api/enquiries`, expecting
-  a `400` validation response, and checking health again afterward.
-
-The published enquiry form also has a real-browser keyboard smoke check:
-
-```sh
-SMOKE_PUBLISHED_URL=https://welltutored.replit.app pnpm smoke:enquiry:published
-```
-
-It uses the current Publishing URL rules above, traverses the form with native
-Tab and Enter actions, verifies validation recovery and disabled-submit
-behavior, and intercepts the final response so the check does not create a
-production enquiry.
-
-For local or custom-domain verification, use the explicit override:
-
-```sh
-SMOKE_BASE_URL=https://example.test pnpm smoke:enquiry
-```
-
-The enquiry payload is intentionally invalid, so the API rejects it before
-looking up a tutor or inserting an enquiry. The command exits non-zero with
-the failing endpoint and response contract when a check does not match.
+`SMOKE_CHROMIUM_PATH` is required: `playwright-core` bundles no browser and
+none of this project's images carry one, so this check runs from wherever a
+Chromium already exists. It is deliberately not in CI for the same reason.

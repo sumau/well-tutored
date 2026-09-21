@@ -76,22 +76,22 @@ Test database unavailable: required command 'initdb' was not found.
 ```
 
 The `test` service supplies the connection, which takes the other branch of
-`scripts/with-test-database.sh`. On Replit the same branch is taken, with the
-dedicated connection coming from the environment instead.
+`scripts/with-test-database.sh`. CI takes the same branch, with the dedicated
+connection coming from its `postgres:16` service container instead.
 
 The suite needs no Clerk credentials and passes without them, so the keys in
 `.env` are irrelevant here even though Compose loads them. See
-[CI and pre-publish validation](ci-validation.md) for why, and for what does
+[CI and deploy validation](ci-validation.md) for why, and for what does
 depend on a live Clerk instance.
 
-Browser smoke checks are excluded; they need Playwright browsers and a proxied
-domain.
+Browser smoke checks are excluded; they need a Chromium these images do not
+carry, named by `SMOKE_CHROMIUM_PATH`.
 
 ## How requests are routed
 
-On Replit a single router fronts both artifacts, so the frontend calls `/api`
-with relative paths. Locally the two run on separate ports, so the Vite dev
-server proxies `/api` to the API service. The target is set by
+The Deployment serves the frontend and the API from one origin, so the frontend
+calls `/api` with relative paths. Locally the two run on separate ports, so the
+Vite dev server proxies `/api` to the API service. The target is set by
 `API_PROXY_TARGET` (`http://api:8080` in Compose, defaulting to
 `http://localhost:8080` for a host-native run).
 
@@ -102,12 +102,12 @@ trusts the frontend's own origin, which Compose states explicitly through
 ## Clerk
 
 `CLERK_SECRET_KEY` is required even for the public site. The API mounts Clerk
-middleware globally, so without a key every request fails with a 500. The
-placeholder in `.env.example` is enough to browse the public experience;
+middleware under `/api`, so without a key every request there fails with a 500.
+The placeholder in `.env.example` is enough to browse the public experience;
 signing in to `/workspace` needs real Clerk keys.
 
-They must be **development** keys (`pk_test_` / `sk_test_`), not the production
-keys from the Replit deployment. Both the frontend and the API resolve their
+They must be **development** keys (`pk_test_` / `sk_test_`), not production
+keys. Both the frontend and the API resolve their
 key through `publishableKeyFromHost`, which returns the configured key as-is
 only when it is a development key; a `pk_live_` key is discarded and a key is
 derived from the hostname instead, producing `clerk.localhost`, which does not

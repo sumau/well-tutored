@@ -12,17 +12,13 @@ type Environment = Record<string, string | undefined>;
  * Resolve the directory holding the built frontend, or undefined when this
  * process is not the one serving it.
  *
- * Replit's router fronted the API and the frontend build on a single domain, so
- * the API never served HTML. Off Replit there is no router, and the frontend has
- * to be served from this origin rather than a separate static host: Clerk's
- * session cookies are same-origin, `requireTrustedMutationOrigin` compares the
- * request origin against this deployment's own, and the Clerk Frontend API proxy
- * rewrites `Clerk-Proxy-Url` from the host the browser actually used.
+ * The frontend is served from this origin rather than a separate static host —
+ * see docs/adr/0001-single-origin-deployment.md.
  *
  * WEB_CLIENT_ROOT names the directory, and its absence is a legitimate state
- * rather than a misconfiguration: under Replit's router, and in development
- * behind the Vite dev server, something else serves the frontend and this
- * process must not. docker/Dockerfile sets it; nothing else does.
+ * rather than a misconfiguration: in development the Vite dev server serves the
+ * frontend and this process must not. docker/Dockerfile sets it; nothing else
+ * does.
  */
 export function resolveWebClientRoot(
   environment: Environment = process.env,
@@ -43,9 +39,9 @@ export function mountWebClient(
 ): void {
   const root = resolveWebClientRoot(environment);
   if (!root) {
-    // Expected on Replit and in development. Logged in production because for a
-    // single-origin container deployment it means every page is about to 404
-    // while /api/healthz keeps answering, which no health check would catch.
+    // Expected in development. Logged in production because there it means
+    // every page is about to 404 while /api/healthz keeps answering, which no
+    // health check would catch.
     if (environment["NODE_ENV"] === "production") {
       logger.warn(
         "WEB_CLIENT_ROOT is not set, so this server is not serving the " +
