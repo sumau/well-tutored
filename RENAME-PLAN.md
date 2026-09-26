@@ -75,7 +75,7 @@ Do **not** touch paths, package names, database names, hostnames or
 
 - [x] `docker compose run --rm test` passes
 - [x] `grep -rn -i "well tutored"` is empty outside `attached_assets/`
-- [ ] PR merged, deploy + launch smoke green, `https://well-tutored.fly.dev`
+- [x] PR merged, deploy + launch smoke green, `https://well-tutored.fly.dev`
       shows the new name
 
 ## Step 3 — Create the `taughtbyher` Fly app (You)
@@ -85,13 +85,21 @@ shows secret values back, so take them from the dashboards: the **pooled**
 Neon connection string, and the Clerk development keys (the same ones the
 current app uses — `fly.toml` already has the publishable one).
 
-- [ ] Create the app and set its secrets:
+- [ ] Create the app and set its secrets. `read -rs` takes each value without
+      echoing it or writing it to shell history; paste it and press Enter.
+      The pooled string gets its own name so it cannot be confused with the
+      direct `DATABASE_URL` you may have exported for schema work:
 
   ```
+  read -rsp 'Pooled DATABASE_URL: ' POOLED_DATABASE_URL; echo
+  read -rsp 'CLERK_SECRET_KEY: ' CLERK_SECRET_KEY; echo
+  read -rsp 'CLERK_PUBLISHABLE_KEY: ' CLERK_PUBLISHABLE_KEY; echo
+
   fly apps create taughtbyher
   fly secrets set -a taughtbyher \
-    DATABASE_URL='postgres://...-pooler...?sslmode=require' \
-    CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
+    DATABASE_URL="$POOLED_DATABASE_URL" \
+    CLERK_SECRET_KEY="$CLERK_SECRET_KEY" \
+    CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"
   ```
 
 - [ ] Leave the token until **just before merging PR 2**: a deploy token is

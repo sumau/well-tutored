@@ -198,17 +198,28 @@ Fly runs the container; Neon holds the database. By this point the Neon
 project exists, the schema is pushed, and you have Clerk development keys — all
 three are prerequisites, not steps you can take afterwards.
 
+Pass the secrets in from shell variables rather than typing them into the
+command. `read -rs` takes each value without echoing it or writing it to shell
+history; paste it and press Enter:
+
 ```
+read -rsp 'Pooled DATABASE_URL: ' POOLED_DATABASE_URL; echo
+read -rsp 'CLERK_SECRET_KEY: ' CLERK_SECRET_KEY; echo
+read -rsp 'CLERK_PUBLISHABLE_KEY: ' CLERK_PUBLISHABLE_KEY; echo
+
 fly apps create well-tutored
-fly secrets set DATABASE_URL='postgres://...?sslmode=require' \
-  CLERK_SECRET_KEY=sk_test_... CLERK_PUBLISHABLE_KEY=pk_test_...
+fly secrets set \
+  DATABASE_URL="$POOLED_DATABASE_URL" \
+  CLERK_SECRET_KEY="$CLERK_SECRET_KEY" \
+  CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"
 ```
 
-Spell that connection string out rather than reusing the `DATABASE_URL` you
-exported for [schema work](#applying-the-schema). They are different strings:
-this one is the **pooled** endpoint the application runs against, the other is
-the **direct** endpoint for DDL. Passing the direct one here works and then
-quietly costs you connection pooling in production.
+The connection string is read as `POOLED_DATABASE_URL`, not `DATABASE_URL`, so
+it cannot be confused with the `DATABASE_URL` you exported for
+[schema work](#applying-the-schema). They are different strings: this one is
+the **pooled** endpoint the application runs against, the other is the
+**direct** endpoint for DDL. Passing the direct one here works and then quietly
+costs you connection pooling in production.
 
 `fly launch --no-deploy` also works, but it rewrites the committed `fly.toml`
 from its own guesses; `git diff fly.toml` afterwards and revert what it changed.
