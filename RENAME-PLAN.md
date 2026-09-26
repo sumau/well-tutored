@@ -85,7 +85,7 @@ shows secret values back, so take them from the dashboards: the **pooled**
 Neon connection string, and the Clerk development keys (the same ones the
 current app uses — `fly.toml` already has the publishable one).
 
-- [ ] Create the app and set its secrets. `read -rs` takes each value without
+- [x] Create the app and set its secrets. `read -rs` takes each value without
       echoing it or writing it to shell history; paste it and press Enter.
       The pooled string gets its own name so it cannot be confused with the
       direct `DATABASE_URL` you may have exported for schema work:
@@ -152,8 +152,8 @@ docker compose build
 docker compose run --rm migrate
 ```
 
-- [ ] `docker compose run --rm test` passes, including `pnpm run docs:check`
-- [ ] `grep -rn -i -E "well[-_ ]?tutored"` is empty outside `attached_assets/`
+- [x] `docker compose run --rm test` passes, including `pnpm run docs:check`
+- [x] `grep -rn -i -E "well[-_ ]?tutored"` is empty outside `attached_assets/`
       and this file
 - [ ] Step 3's token is set, then PR merged; deploy + launch smoke green
       against `https://taughtbyher.fly.dev`
