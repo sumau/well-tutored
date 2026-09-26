@@ -1,4 +1,4 @@
-# Well Tutored
+# Taught by Her
 
 A public directory of tutors and the teaching resources they write, plus a
 private area where those tutors maintain their own profiles and content. One

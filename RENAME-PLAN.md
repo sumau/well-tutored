@@ -73,8 +73,8 @@ Change:
 Do **not** touch paths, package names, database names, hostnames or
 `fly.toml`'s `app` — those are PR 2.
 
-- [ ] `docker compose run --rm test` passes
-- [ ] `grep -rn -i "well tutored"` is empty outside `attached_assets/`
+- [x] `docker compose run --rm test` passes
+- [x] `grep -rn -i "well tutored"` is empty outside `attached_assets/`
 - [ ] PR merged, deploy + launch smoke green, `https://well-tutored.fly.dev`
       shows the new name
 
