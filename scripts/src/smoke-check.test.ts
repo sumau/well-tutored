@@ -64,7 +64,7 @@ function writeJson(
 
 function writePage(
   response: ServerResponse<IncomingMessage>,
-  body = "<!doctype html><title>Well Tutored</title>",
+  body = "<!doctype html><title>Taught by Her</title>",
   contentType = "text/html",
 ) {
   response.writeHead(200, { "content-type": contentType });
