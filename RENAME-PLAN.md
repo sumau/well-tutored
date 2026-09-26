@@ -75,7 +75,7 @@ Do **not** touch paths, package names, database names, hostnames or
 
 - [x] `docker compose run --rm test` passes
 - [x] `grep -rn -i "well tutored"` is empty outside `attached_assets/`
-- [ ] PR merged, deploy + launch smoke green, `https://well-tutored.fly.dev`
+- [x] PR merged, deploy + launch smoke green, `https://well-tutored.fly.dev`
       shows the new name
 
 ## Step 3 — Create the `taughtbyher` Fly app (You)
